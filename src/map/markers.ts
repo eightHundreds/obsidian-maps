@@ -168,12 +168,12 @@ export class MarkerManager {
 		// Collect all unique icon+color combinations that need to be loaded
 		const compositeImagesToLoad: Array<{ icon: string | null; color: string }> = [];
 		const uniqueKeys = new Set<string>();
-		
+
 		for (const markerData of markers) {
 			const icon = this.getCustomIcon(markerData.entry);
 			const color = this.getCustomColor(markerData.entry) || 'var(--bases-map-marker-background)';
 			const compositeKey = this.getCompositeImageKey(icon, color);
-			
+
 			if (!this.loadedIcons.has(compositeKey)) {
 				if (!uniqueKeys.has(compositeKey)) {
 					compositeImagesToLoad.push({ icon, color });
@@ -187,7 +187,7 @@ export class MarkerManager {
 			try {
 				const compositeKey = this.getCompositeImageKey(icon, color);
 				const img = await this.createCompositeMarkerImage(icon, color);
-				
+
 				if (this.map) {
 					// Force update of the image on theme change
 					if (this.map.hasImage(compositeKey)) {
@@ -215,7 +215,7 @@ export class MarkerManager {
 
 		// Get the computed color value
 		const computedColor = getComputedStyle(tempEl).color;
-		
+
 		// Clean up
 		tempEl.remove();
 
@@ -234,7 +234,7 @@ export class MarkerManager {
 		canvas.width = size;
 		canvas.height = size;
 		const ctx = canvas.getContext('2d');
-		
+
 		if (!ctx) {
 			throw new Error('Failed to get canvas context');
 		}
@@ -247,33 +247,33 @@ export class MarkerManager {
 		const centerX = size / 2;
 		const centerY = size / 2;
 		const radius = 12 * scale;
-		
+
 		ctx.fillStyle = resolvedColor;
 		ctx.beginPath();
 		ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
 		ctx.fill();
-		
+
 		ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
 		ctx.lineWidth = 1 * scale;
 		ctx.stroke();
-		
+
 		// Draw the icon or dot
 		if (icon) {
 			// Load and draw custom icon
 			const iconDiv = createDiv();
 			setIcon(iconDiv, icon);
 			const svgEl = iconDiv.querySelector('svg');
-			
+
 			if (svgEl) {
 				svgEl.setAttribute('stroke', 'currentColor');
 				svgEl.setAttribute('fill', 'none');
 				svgEl.setAttribute('stroke-width', '2');
 				svgEl.style.color = resolvedIconColor;
-				
+
 				const svgString = new XMLSerializer().serializeToString(svgEl);
 				const iconImg = new Image();
 				iconImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
-				
+
 				await new Promise<void>((resolve, reject) => {
 					iconImg.onload = () => {
 						// Draw icon centered and scaled
@@ -306,7 +306,7 @@ export class MarkerManager {
 					reject(new Error('Failed to create image blob'));
 					return;
 				}
-				
+
 				const img = new Image();
 				img.onload = () => resolve(img);
 				img.onerror = reject;
@@ -420,14 +420,14 @@ export class MarkerManager {
 		this.map.on('contextmenu', 'marker-pins', (e: MapLayerMouseEvent) => {
 			e.preventDefault();
 			if (!e.features || e.features.length === 0) return;
-			
+
 			const feature = e.features[0];
 			const entryIndex = feature.properties?.entryIndex;
 			if (entryIndex !== undefined && this.markers[entryIndex]) {
 				const markerData = this.markers[entryIndex];
 				const [lat, lng] = markerData.coordinates;
 				const file = markerData.entry.file;
-				
+
 				const menu = Menu.forEvent(e.originalEvent);
 				this.app.workspace.handleLinkContextMenu(menu, file.path, '');
 
