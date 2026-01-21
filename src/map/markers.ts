@@ -3,6 +3,8 @@ import { Map, LngLatBounds, GeoJSONSource, MapLayerMouseEvent } from 'maplibre-g
 import { MapMarker, MapMarkerProperties } from './types';
 import { coordinateFromValue } from './utils';
 import { PopupManager } from './popup';
+import { wgs84ToGcj02 } from './coords';
+import type { CoordSystem } from '../settings';
 
 export class MarkerManager {
 	private map: Map | null = null;
@@ -81,14 +83,17 @@ export class MarkerManager {
 
 		this.markers = validMarkers;
 
-		// Calculate bounds for all markers
+		const coordSystem: CoordSystem = mapConfig?.mapCoordSystem || 'wgs84';
+
 		const bounds = this.bounds = new LngLatBounds();
 		validMarkers.forEach(markerData => {
-			const [lat, lng] = markerData.coordinates;
+			let [lat, lng] = markerData.coordinates;
+			if (coordSystem === 'gcj02') {
+				[lat, lng] = wgs84ToGcj02(lat, lng);
+			}
 			bounds.extend([lng, lat]);
 		});
 
-		// Load all custom icons and create GeoJSON features
 		await this.loadCustomIcons(validMarkers);
 		const features = this.createGeoJSONFeatures(validMarkers);
 
@@ -316,15 +321,23 @@ export class MarkerManager {
 	}
 
 	private createGeoJSONFeatures(markers: MapMarker[]): GeoJSON.Feature[] {
+		const mapConfig = this.getMapConfig();
+		const coordSystem: CoordSystem = mapConfig?.mapCoordSystem || 'wgs84';
+
 		return markers.map((markerData, index) => {
-			const [lat, lng] = markerData.coordinates;
+			let [lat, lng] = markerData.coordinates;
+			
+			if (coordSystem === 'gcj02') {
+				[lat, lng] = wgs84ToGcj02(lat, lng);
+			}
+
 			const icon = this.getCustomIcon(markerData.entry);
 			const color = this.getCustomColor(markerData.entry) || 'var(--bases-map-marker-background)';
 			const compositeKey = this.getCompositeImageKey(icon, color);
 
 			const properties: MapMarkerProperties = {
 				entryIndex: index,
-				icon: compositeKey, // Use composite image key
+				icon: compositeKey,
 			};
 
 			return {
@@ -386,9 +399,13 @@ export class MarkerManager {
 				const data = this.getData();
 				const mapConfig = this.getMapConfig();
 				if (data && data.properties && mapConfig) {
+					let [lat, lng] = markerData.coordinates;
+					if (mapConfig.mapCoordSystem === 'gcj02') {
+						[lat, lng] = wgs84ToGcj02(lat, lng);
+					}
 					this.popupManager.showPopup(
 						markerData.entry,
-						markerData.coordinates,
+						[lat, lng],
 						data.properties,
 						mapConfig.coordinatesProp,
 						mapConfig.markerIconProp,

@@ -19,6 +19,8 @@ import { PopupManager } from './map/popup';
 import { MarkerManager } from './map/markers';
 import { hasOwnProperty, coordinateFromValue } from './map/utils';
 import { rtlPluginCode } from './map/rtl-plugin-code';
+import { wgs84ToGcj02, gcj02ToWgs84 } from './map/coords';
+import type { CoordSystem, TileSet } from './settings';
 
 interface MapConfig {
 	coordinatesProp: BasesPropertyId | null;
@@ -32,6 +34,7 @@ interface MapConfig {
 	mapTiles: string[];
 	mapTilesDark: string[];
 	currentTileSetId: string | null;
+	mapCoordSystem: CoordSystem;
 }
 
 export const MapViewType = 'map';
@@ -126,12 +129,16 @@ export class MapView extends BasesView {
 		if (!tileSet || !this.mapConfig) return;
 
 		this.mapConfig.currentTileSetId = tileSetId;
+		this.mapConfig.mapCoordSystem = tileSet.coordSystem || 'wgs84';
 
 		// Update the current tiles
 		this.mapConfig.mapTiles = tileSet.lightTiles ? [tileSet.lightTiles] : [];
 		this.mapConfig.mapTilesDark = tileSet.darkTiles
 			? [tileSet.darkTiles]
 			: (tileSet.lightTiles ? [tileSet.lightTiles] : []);
+
+		// Save to Base config
+		this.config.set('background', tileSetId);
 
 		// Update the map style
 		await this.updateMapStyle();
@@ -173,21 +180,34 @@ export class MapView extends BasesView {
 		const mapStyle = await this.styleManager.getMapStyle(this.mapConfig.mapTiles, this.mapConfig.mapTilesDark);
 
 		// Determine initial position: prefer ephemeral state if available, otherwise use config
-		let initialCenter: [number, number] = [this.mapConfig.center[1], this.mapConfig.center[0]]; // MapLibre uses [lng, lat]
+		let [centerLat, centerLng] = this.mapConfig.center;
+		if (this.mapConfig.mapCoordSystem === 'gcj02') {
+			[centerLat, centerLng] = wgs84ToGcj02(centerLat, centerLng);
+		}
+		let initialCenter: [number, number] = [centerLng, centerLat]; // MapLibre 使用 [lng, lat] 格式
 		let initialZoom = this.mapConfig.defaultZoom;
 
-		// Capture if we are starting with a pending state restoration
+		// 判断是否正在恢复之前保存的状态
 		const isRestoringState = this.pendingMapState !== null;
 
 		if (this.pendingMapState) {
 			if (this.pendingMapState.center) {
 				const c = this.pendingMapState.center;
-				// Handle LngLatLike (array or object)
+				// 处理 LngLatLike 类型（数组或对象）
+				let lat: number, lng: number;
 				if (Array.isArray(c)) {
-					initialCenter = [c[0], c[1]];
+					[lng, lat] = c;
 				} else if (typeof c === 'object' && 'lng' in c && 'lat' in c) {
-					initialCenter = [c.lng, c.lat];
+					lng = c.lng;
+					lat = c.lat;
+				} else {
+					lng = initialCenter[0];
+					lat = initialCenter[1];
 				}
+				if (this.mapConfig.mapCoordSystem === 'gcj02') {
+					[lat, lng] = wgs84ToGcj02(lat, lng);
+				}
+				initialCenter = [lng, lat];
 			}
 			if (this.pendingMapState.zoom !== undefined && this.pendingMapState.zoom !== null) {
 				initialZoom = this.pendingMapState.zoom;
@@ -233,31 +253,35 @@ export class MapView extends BasesView {
 		this.map.on('load', () => {
 			if (!this.map || !this.mapConfig) return;
 
-			// If we were restoring state, do not reset to defaults
+			// 如果正在恢复状态，不要重置为默认值
 			if (isRestoringState || this.pendingMapState) return;
 
 			const hasConfiguredCenter = this.mapConfig.center[0] !== 0 || this.mapConfig.center[1] !== 0;
 			const hasConfiguredZoom = this.config.get('defaultZoom') && Number.isNumber(this.config.get('defaultZoom'));
 
-			// Set center based on configuration
+			// 根据配置设置中心点
 			if (hasConfiguredCenter) {
-				this.map.setCenter([this.mapConfig.center[1], this.mapConfig.center[0]]); // MapLibre uses [lng, lat]
+				let [lat, lng] = this.mapConfig.center;
+				if (this.mapConfig.mapCoordSystem === 'gcj02') {
+					[lat, lng] = wgs84ToGcj02(lat, lng);
+				}
+				this.map.setCenter([lng, lat]); // MapLibre 使用 [lng, lat] 格式
 			}
 			else {
 				const bounds = this.markerManager.getBounds();
 				if (bounds) {
-					this.map.setCenter(bounds.getCenter()); // Center on markers
+					this.map.setCenter(bounds.getCenter()); // 居中到标记点
 				}
 			}
 
-			// Set zoom based on configuration
+			// 根据配置设置缩放级别
 			if (hasConfiguredZoom) {
-				this.map.setZoom(this.mapConfig.defaultZoom); // Use configured zoom
+				this.map.setZoom(this.mapConfig.defaultZoom); // 使用配置的缩放级别
 			}
 			else {
 				const bounds = this.markerManager.getBounds();
 				if (bounds) {
-					this.map.fitBounds(bounds, { padding: 20 }); // Fit all markers
+					this.map.fitBounds(bounds, { padding: 20 }); // 自适应所有标记点
 				}
 			}
 		});
@@ -312,11 +336,20 @@ export class MapView extends BasesView {
 			if (this.map && this.data) {
 				await this.markerManager.updateMarkers(this.data);
 
-				// Apply pending map state if available (for restoring ephemeral state)
 				if (this.pendingMapState && this.map) {
 					const { center, zoom } = this.pendingMapState;
 					if (center) {
-						this.map.setCenter(center);
+						let lat: number, lng: number;
+						if ('lng' in center && 'lat' in center) {
+							lng = center.lng as number;
+							lat = center.lat as number;
+						} else {
+							[lng, lat] = center as [number, number];
+						}
+						if (this.mapConfig?.mapCoordSystem === 'gcj02') {
+							[lat, lng] = wgs84ToGcj02(lat, lng);
+						}
+						this.map.setCenter([lng, lat]);
 					}
 					if (zoom !== null && zoom !== undefined) {
 						this.map.setZoom(zoom);
@@ -346,11 +379,14 @@ export class MapView extends BasesView {
 
 		const hasConfiguredCenter = this.mapConfig.center[0] !== 0 || this.mapConfig.center[1] !== 0;
 		if (hasConfiguredCenter) {
-			// Only recenter if the evaluated coordinates actually changed
 			const currentCenter = this.map.getCenter();
-			if (!currentCenter) return; // Map not fully initialized yet
+			if (!currentCenter) return;
 
-			const targetCenter: [number, number] = [this.mapConfig.center[1], this.mapConfig.center[0]]; // MapLibre uses [lng, lat]
+			let [lat, lng] = this.mapConfig.center;
+			if (this.mapConfig.mapCoordSystem === 'gcj02') {
+				[lat, lng] = wgs84ToGcj02(lat, lng);
+			}
+			const targetCenter: [number, number] = [lng, lat];
 			const centerActuallyChanged = Math.abs(currentCenter.lng - targetCenter[0]) > 0.00001 ||
 				Math.abs(currentCenter.lat - targetCenter[1]) > 0.00001;
 			if (centerActuallyChanged) {
@@ -438,55 +474,51 @@ export class MapView extends BasesView {
 	}
 
 	private loadConfig(currentTileSetId: string | null): MapConfig {
-		// Load property configurations
 		const coordinatesProp = this.config.getAsPropertyId('coordinates');
 		const markerIconProp = this.config.getAsPropertyId('markerIcon');
 		const markerColorProp = this.config.getAsPropertyId('markerColor');
 
-		// Load numeric configurations with validation
 		const minZoom = this.getNumericConfig('minZoom', 0, 0, 24);
 		const maxZoom = this.getNumericConfig('maxZoom', 18, 0, 24);
 		const defaultZoom = this.getNumericConfig('defaultZoom', DEFAULT_MAP_ZOOM, minZoom, maxZoom);
 
-		// Load center coordinates
 		const center = this.getCenterFromConfig();
 
-		// Load map height for embedded views
 		const mapHeight = this.isEmbedded()
 			? this.getNumericConfig('mapHeight', DEFAULT_MAP_HEIGHT, 100, 2000)
 			: DEFAULT_MAP_HEIGHT;
 
-		// Load map tiles configurations
-		// Use view-specific tiles if configured, otherwise fall back to plugin defaults
 		const viewSpecificTiles = this.getArrayConfig('mapTiles');
 		const viewSpecificTilesDark = this.getArrayConfig('mapTilesDark');
-
+		const backgroundId = this.config.get('background') as string | undefined;
 		let mapTiles: string[];
 		let mapTilesDark: string[];
 		let selectedTileSetId: string | null;
+		let mapCoordSystem: CoordSystem = 'wgs84';
 
 		if (viewSpecificTiles.length > 0) {
-			// View has specific tiles configured
 			mapTiles = viewSpecificTiles;
 			mapTilesDark = viewSpecificTilesDark;
 			selectedTileSetId = null;
-		} else if (this.plugin.settings.tileSets.length > 0) {
-			// Use first tile set from plugin settings (or previously selected one)
-			const tileSet = currentTileSetId
-				? this.plugin.settings.tileSets.find(ts => ts.id === currentTileSetId)
+		} else {
+			const tileSetId = backgroundId || currentTileSetId;
+			const tileSet = tileSetId
+				? this.plugin.settings.tileSets.find(ts => ts.id === tileSetId)
 				: null;
 			const selectedTileSet = tileSet || this.plugin.settings.tileSets[0];
 
-			selectedTileSetId = selectedTileSet.id;
-			mapTiles = selectedTileSet.lightTiles ? [selectedTileSet.lightTiles] : [];
-			mapTilesDark = selectedTileSet.darkTiles
-				? [selectedTileSet.darkTiles]
-				: (selectedTileSet.lightTiles ? [selectedTileSet.lightTiles] : []);
-		} else {
-			// No tiles configured, will fall back to default style
-			mapTiles = [];
-			mapTilesDark = [];
-			selectedTileSetId = null;
+			if (selectedTileSet) {
+				selectedTileSetId = selectedTileSet.id;
+				mapTiles = selectedTileSet.lightTiles ? [selectedTileSet.lightTiles] : [];
+				mapTilesDark = selectedTileSet.darkTiles
+					? [selectedTileSet.darkTiles]
+					: (selectedTileSet.lightTiles ? [selectedTileSet.lightTiles] : []);
+				mapCoordSystem = selectedTileSet.coordSystem || 'wgs84';
+			} else {
+				mapTiles = [];
+				mapTilesDark = [];
+				selectedTileSetId = null;
+			}
 		}
 
 		return {
@@ -501,6 +533,7 @@ export class MapView extends BasesView {
 			mapTiles,
 			mapTilesDark,
 			currentTileSetId: selectedTileSetId,
+			mapCoordSystem,
 		};
 	}
 
@@ -571,19 +604,26 @@ export class MapView extends BasesView {
 			mapHeight: this.config.get('mapHeight'),
 			mapTiles: this.config.get('mapTiles'),
 			mapTilesDark: this.config.get('mapTilesDark'),
+			background: this.config.get('background'),
 		});
 	}
 
 	private showMapContextMenu(evt: MouseEvent): void {
 		if (!this.map || !this.mapConfig) return;
 
-		const currentZoom = Math.round(this.map.getZoom() * 10) / 10; // Round to 1 decimal place
+		const currentZoom = Math.round(this.map.getZoom() * 10) / 10;
 
-		// Get coordinates from the location of the right-click event, not the map center
 		const clickPoint: [number, number] = [evt.offsetX, evt.offsetY];
 		const clickedCoords = this.map.unproject(clickPoint);
-		const currentLat = Math.round(clickedCoords.lat * 100000) / 100000;
-		const currentLng = Math.round(clickedCoords.lng * 100000) / 100000;
+		let displayLat = Math.round(clickedCoords.lat * 100000) / 100000;
+		let displayLng = Math.round(clickedCoords.lng * 100000) / 100000;
+
+		// Convert from map coords (GCJ-02) to storage coords (WGS-84) if needed
+		if (this.mapConfig.mapCoordSystem === 'gcj02') {
+			[displayLat, displayLng] = gcj02ToWgs84(displayLat, displayLng);
+			displayLat = Math.round(displayLat * 100000) / 100000;
+			displayLng = Math.round(displayLng * 100000) / 100000;
+		}
 
 		const menu = Menu.forEvent(evt);
 		menu.addItem(item => item
@@ -592,13 +632,11 @@ export class MapView extends BasesView {
 			.setIcon('square-pen')
 			.onClick(() => {
 				void this.createFileForView('', (frontmatter) => {
-					// Pre-fill coordinates if a coordinates property is configured
 					if (this.mapConfig?.coordinatesProp) {
-						// Remove 'note.' prefix if present
 						const propertyKey = this.mapConfig.coordinatesProp.startsWith('note.')
 							? this.mapConfig.coordinatesProp.slice(5)
 							: this.mapConfig.coordinatesProp;
-						frontmatter[propertyKey] = [currentLat.toString(), currentLng.toString()];
+						frontmatter[propertyKey] = [displayLat.toString(), displayLng.toString()];
 					}
 				});
 			})
@@ -609,7 +647,7 @@ export class MapView extends BasesView {
 			.setSection('action')
 			.setIcon('copy')
 			.onClick(() => {
-				const coordString = `${currentLat}, ${currentLng}`;
+				const coordString = `${displayLat}, ${displayLng}`;
 				void navigator.clipboard.writeText(coordString);
 			})
 		);
@@ -619,21 +657,20 @@ export class MapView extends BasesView {
 			.setSection('action')
 			.setIcon('map-pin')
 			.onClick(() => {
-				// Set the current center as the default coordinates
-				const coordListStr = `[${currentLat}, ${currentLng}]`;
+				const coordListStr = `[${displayLat}, ${displayLng}]`;
 
-				// 1. Update the component's internal state immediately.
-				// This ensures that if a re-render is triggered, its logic will use the
-				// new coordinates and prevent the map from recentering on markers.
 				if (this.mapConfig) {
-					this.mapConfig.center = [currentLat, currentLng];
+					this.mapConfig.center = [displayLat, displayLng];
 				}
 
-				// 2. Set the config value, which will be saved.
 				this.config.set('center', coordListStr);
 
-				// 3. Immediately move the map for instant user feedback.
-				this.map?.setCenter([currentLng, currentLat]); // MapLibre uses [lng, lat]
+				// Convert back to map coords for setCenter
+				let mapLat = displayLat, mapLng = displayLng;
+				if (this.mapConfig?.mapCoordSystem === 'gcj02') {
+					[mapLat, mapLng] = wgs84ToGcj02(displayLat, displayLng);
+				}
+				this.map?.setCenter([mapLng, mapLat]);
 			})
 		);
 
@@ -668,109 +705,113 @@ export class MapView extends BasesView {
 	}
 
 	public getEphemeralState(): unknown {
-		if (!this.map) return {};
+		if (!this.map || !this.mapConfig) return {};
 
 		const center = this.map.getCenter();
+		let lat = center.lat, lng = center.lng;
+		if (this.mapConfig.mapCoordSystem === 'gcj02') {
+			[lat, lng] = gcj02ToWgs84(lat, lng);
+		}
 		return {
-			center: { lng: center.lng, lat: center.lat },
+			center: { lng, lat },
 			zoom: this.map.getZoom(),
 		};
 	}
+}
 
-	static getViewOptions(): ViewOption[] {
-		return [
-			{
-				displayName: 'Embedded height',
-				type: 'slider',
-				key: 'mapHeight',
-				min: 200,
-				max: 800,
-				step: 20,
-				default: DEFAULT_MAP_HEIGHT,
-			},
-			{
-				displayName: 'Display',
-				type: 'group',
-				items: [
-
-					{
-						displayName: 'Center coordinates',
-						type: 'formula',
-						key: 'center',
-						placeholder: '[latitude, longitude]',
-					},
-					{
-						displayName: 'Default zoom',
-						type: 'slider',
-						key: 'defaultZoom',
-						min: 1,
-						max: 18,
-						step: 1,
-						default: DEFAULT_MAP_ZOOM,
-					},
-					{
-						displayName: 'Minimum zoom',
-						type: 'slider',
-						key: 'minZoom',
-						min: 0,
-						max: 24,
-						step: 1,
-						default: 0,
-					},
-					{
-						displayName: 'Maximum zoom',
-						type: 'slider',
-						key: 'maxZoom',
-						min: 0,
-						max: 24,
-						step: 1,
-						default: 18,
-					},
-				]
-			},
-			{
-				displayName: 'Markers',
-				type: 'group',
-				items: [
-					{
-						displayName: 'Marker coordinates',
-						type: 'property',
-						key: 'coordinates',
-						filter: prop => !prop.startsWith('file.'),
-						placeholder: 'Property',
-					},
-					{
-						displayName: 'Marker icon',
-						type: 'property',
-						key: 'markerIcon',
-						filter: prop => !prop.startsWith('file.'),
-						placeholder: 'Property',
-					},
-					{
-						displayName: 'Marker color',
-						type: 'property',
-						key: 'markerColor',
-						filter: prop => !prop.startsWith('file.'),
-						placeholder: 'Property',
-					},
-				]
-			},
-			{
-				displayName: 'Background',
-				type: 'group',
-				items: [
-					{
-						displayName: 'Map tiles',
-						type: 'multitext',
-						key: 'mapTiles',
-					},
-					{
-						displayName: 'Map tiles in dark mode',
-						type: 'multitext',
-						key: 'mapTilesDark',
-					},
-				]
-			},
-		];
-	}
+export function getViewOptions(): ViewOption[] {
+	return [
+		{
+			displayName: 'Embedded height',
+			type: 'slider',
+			key: 'mapHeight',
+			min: 200,
+			max: 800,
+			step: 20,
+			default: DEFAULT_MAP_HEIGHT,
+		},
+		{
+			displayName: 'Display',
+			type: 'group',
+			items: [
+				{
+					displayName: 'Center coordinates',
+					type: 'formula',
+					key: 'center',
+					placeholder: '[latitude, longitude]',
+				},
+				{
+					displayName: 'Default zoom',
+					type: 'slider',
+					key: 'defaultZoom',
+					min: 1,
+					max: 18,
+					step: 1,
+					default: DEFAULT_MAP_ZOOM,
+				},
+				{
+					displayName: 'Minimum zoom',
+					type: 'slider',
+					key: 'minZoom',
+					min: 0,
+					max: 24,
+					step: 1,
+					default: 0,
+				},
+				{
+					displayName: 'Maximum zoom',
+					type: 'slider',
+					key: 'maxZoom',
+					min: 0,
+					max: 24,
+					step: 1,
+					default: 18,
+				},
+			]
+		},
+		{
+			displayName: 'Markers',
+			type: 'group',
+			items: [
+				{
+					displayName: 'Marker coordinates',
+					type: 'property',
+					key: 'coordinates',
+					filter: (prop: string) => !prop.startsWith('file.'),
+					placeholder: 'Property',
+					default: 'note.location',
+				},
+				{
+					displayName: 'Marker icon',
+					type: 'property',
+					key: 'markerIcon',
+					filter: (prop: string) => !prop.startsWith('file.'),
+					placeholder: 'Property',
+				},
+				{
+					displayName: 'Marker color',
+					type: 'property',
+					key: 'markerColor',
+					filter: (prop: string) => !prop.startsWith('file.'),
+					placeholder: 'Property',
+				},
+			]
+		},
+		{
+			displayName: 'Custom background',
+			type: 'group',
+			items: [
+				{
+					displayName: 'Map tiles',
+					type: 'multitext',
+					key: 'mapTiles',
+				},
+				{
+					displayName: 'Map tiles in dark mode',
+					type: 'multitext',
+					key: 'mapTilesDark',
+				},
+			]
+		},
+	];
 }

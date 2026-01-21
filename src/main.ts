@@ -1,5 +1,5 @@
 import { Plugin } from 'obsidian';
-import { MapView } from './map-view';
+import { MapView, getViewOptions } from './map-view';
 import { MapSettings, DEFAULT_SETTINGS, MapSettingTab } from './settings';
 
 export default class ObsidianMapsPlugin extends Plugin {
@@ -12,7 +12,7 @@ export default class ObsidianMapsPlugin extends Plugin {
 			name: 'Map',
 			icon: 'lucide-map',
 			factory: (controller, containerEl) => new MapView(controller, containerEl, this),
-			options: MapView.getViewOptions,
+			options: () => getViewOptions(),
 		});
 
 		this.addSettingTab(new MapSettingTab(this.app, this));
@@ -20,6 +20,10 @@ export default class ObsidianMapsPlugin extends Plugin {
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.settings.tileSets = this.settings.tileSets.map(ts => ({
+			...ts,
+			coordSystem: ts.coordSystem || 'wgs84'
+		}));
 	}
 
 	async saveSettings() {
