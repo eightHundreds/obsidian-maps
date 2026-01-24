@@ -239,18 +239,7 @@ export class MapView extends BasesView implements HoverParent {
 
 		this.map.addControl(new CustomZoomControl(), 'top-right');
 
-		if (this.plugin.settings.enableGeolocation && this.geolocationManager.isSupported()) {
-			this.geolocationManager.setMap(this.map);
-			this.geolocationManager.setCoordSystem(this.mapConfig.mapCoordSystem);
-			
-			this.locateControl = new LocateControl(() => {
-				void this.geolocationManager.locateAndFlyTo();
-			});
-			this.geolocationManager.setOnStatusChange((status) => {
-				this.locateControl?.setStatus(status);
-			});
-			this.map.addControl(this.locateControl, 'top-right');
-		}
+		
 
 		if (this.plugin.settings.tileSets.length > 1) {
 			const currentId = this.mapConfig.currentTileSetId || this.plugin.settings.tileSets[0]?.id || '';
@@ -264,6 +253,19 @@ export class MapView extends BasesView implements HoverParent {
 					'top-right'
 				);
 			}
+		}
+
+		if (this.plugin.settings.enableGeolocation && this.geolocationManager.isSupported()) {
+			this.geolocationManager.setMap(this.map);
+			this.geolocationManager.setCoordSystem(this.mapConfig.mapCoordSystem);
+			
+			this.locateControl = new LocateControl(() => {
+				void this.geolocationManager.locateAndFlyTo();
+			});
+			this.geolocationManager.setOnStatusChange((status) => {
+				this.locateControl?.setStatus(status);
+			});
+			this.map.addControl(this.locateControl, 'top-right');
 		}
 
 		this.map.on('error', (e) => {
@@ -661,6 +663,18 @@ export class MapView extends BasesView implements HoverParent {
 							? this.mapConfig.coordinatesProp.slice(5)
 							: this.mapConfig.coordinatesProp;
 						frontmatter[propertyKey] = [displayLat.toString(), displayLng.toString()];
+					}
+					if (this.mapConfig?.markerIconProp) {
+						const iconKey = this.mapConfig.markerIconProp.startsWith('note.')
+							? this.mapConfig.markerIconProp.slice(5)
+							: this.mapConfig.markerIconProp;
+						frontmatter[iconKey] = 'lucide-map-pin';
+					}
+					if (this.mapConfig?.markerColorProp) {
+						const colorKey = this.mapConfig.markerColorProp.startsWith('note.')
+							? this.mapConfig.markerColorProp.slice(5)
+							: this.mapConfig.markerColorProp;
+						frontmatter[colorKey] = '';
 					}
 				});
 			})

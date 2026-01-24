@@ -2,11 +2,13 @@ import { Plugin } from 'obsidian';
 import { MapView, getViewOptions } from './map-view';
 import { MapSettings, DEFAULT_SETTINGS, MapSettingTab } from './settings';
 import { initI18n, t } from './i18n';
+import { registerCustomPropertyTypes } from './property-types';
 
 const HOVER_SOURCE_ID = 'bases-map';
 
 export default class ObsidianMapsPlugin extends Plugin {
 	settings: MapSettings;
+	private unregisterPropertyTypes: (() => void) | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -25,6 +27,10 @@ export default class ObsidianMapsPlugin extends Plugin {
 		});
 
 		this.addSettingTab(new MapSettingTab(this.app, this));
+
+		this.app.workspace.onLayoutReady(() => {
+			this.unregisterPropertyTypes = registerCustomPropertyTypes(this.app);
+		});
 	}
 
 	async loadSettings() {
@@ -40,5 +46,9 @@ export default class ObsidianMapsPlugin extends Plugin {
 	}
 
 	onunload() {
+		if (this.unregisterPropertyTypes) {
+			this.unregisterPropertyTypes();
+			this.unregisterPropertyTypes = null;
+		}
 	}
 }

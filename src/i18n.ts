@@ -49,6 +49,8 @@ interface Translations {
 	'viewOption.customBackground': string;
 	'viewOption.mapTiles': string;
 	'viewOption.mapTilesDark': string;
+	'propertyType.icon': string;
+	'propertyType.color': string;
 }
 
 const en: Translations = {
@@ -100,6 +102,8 @@ const en: Translations = {
 	'viewOption.customBackground': 'Custom background',
 	'viewOption.mapTiles': 'Map tiles',
 	'viewOption.mapTilesDark': 'Map tiles in dark mode',
+	'propertyType.icon': 'Icon',
+	'propertyType.color': 'Color',
 };
 
 const zh: Translations = {
@@ -151,6 +155,8 @@ const zh: Translations = {
 	'viewOption.customBackground': '自定义背景',
 	'viewOption.mapTiles': '地图瓦片',
 	'viewOption.mapTilesDark': '深色模式地图瓦片',
+	'propertyType.icon': '图标',
+	'propertyType.color': '颜色',
 };
 
 const translations: Record<Locale, Translations> = { en, zh };
