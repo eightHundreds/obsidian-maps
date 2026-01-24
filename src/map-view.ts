@@ -25,6 +25,7 @@ import { hasOwnProperty, coordinateFromValue } from './map/utils';
 import { rtlPluginCode } from './map/rtl-plugin-code';
 import { wgs84ToGcj02, gcj02ToWgs84 } from './map/coords';
 import type { CoordSystem, TileSet } from './settings';
+import { t } from './i18n';
 
 interface MapConfig {
 	coordinatesProp: BasesPropertyId | null;
@@ -650,7 +651,7 @@ export class MapView extends BasesView implements HoverParent {
 
 		const menu = Menu.forEvent(evt);
 		menu.addItem(item => item
-			.setTitle('New note')
+			.setTitle(t('menu.newNote'))
 			.setSection('action')
 			.setIcon('square-pen')
 			.onClick(() => {
@@ -666,7 +667,7 @@ export class MapView extends BasesView implements HoverParent {
 		);
 
 		menu.addItem(item => item
-			.setTitle('Copy coordinates')
+			.setTitle(t('menu.copyCoordinates'))
 			.setSection('action')
 			.setIcon('copy')
 			.onClick(() => {
@@ -676,7 +677,7 @@ export class MapView extends BasesView implements HoverParent {
 		);
 
 		menu.addItem(item => item
-			.setTitle('Set default center point')
+			.setTitle(t('menu.setDefaultCenter'))
 			.setSection('action')
 			.setIcon('map-pin')
 			.onClick(() => {
@@ -698,7 +699,7 @@ export class MapView extends BasesView implements HoverParent {
 		);
 
 		menu.addItem(item => item
-			.setTitle(`Set default zoom (${currentZoom})`)
+			.setTitle(`${t('menu.setDefaultZoom')} (${currentZoom})`)
 			.setSection('action')
 			.setIcon('crosshair')
 			.onClick(() => {
@@ -745,7 +746,7 @@ export class MapView extends BasesView implements HoverParent {
 export function getViewOptions(): ViewOption[] {
 	return [
 		{
-			displayName: 'Embedded height',
+			displayName: t('viewOption.embeddedHeight'),
 			type: 'slider',
 			key: 'mapHeight',
 			min: 200,
@@ -754,17 +755,17 @@ export function getViewOptions(): ViewOption[] {
 			default: DEFAULT_MAP_HEIGHT,
 		},
 		{
-			displayName: 'Display',
+			displayName: t('viewOption.display'),
 			type: 'group',
 			items: [
 				{
-					displayName: 'Center coordinates',
+					displayName: t('viewOption.centerCoordinates'),
 					type: 'formula',
 					key: 'center',
-					placeholder: '[latitude, longitude]',
+					placeholder: t('viewOption.centerPlaceholder'),
 				},
 				{
-					displayName: 'Default zoom',
+					displayName: t('viewOption.defaultZoom'),
 					type: 'slider',
 					key: 'defaultZoom',
 					min: 1,
@@ -773,7 +774,7 @@ export function getViewOptions(): ViewOption[] {
 					default: DEFAULT_MAP_ZOOM,
 				},
 				{
-					displayName: 'Minimum zoom',
+					displayName: t('viewOption.minZoom'),
 					type: 'slider',
 					key: 'minZoom',
 					min: 0,
@@ -782,7 +783,7 @@ export function getViewOptions(): ViewOption[] {
 					default: 0,
 				},
 				{
-					displayName: 'Maximum zoom',
+					displayName: t('viewOption.maxZoom'),
 					type: 'slider',
 					key: 'maxZoom',
 					min: 0,
@@ -793,44 +794,44 @@ export function getViewOptions(): ViewOption[] {
 			]
 		},
 		{
-			displayName: 'Markers',
+			displayName: t('viewOption.markers'),
 			type: 'group',
 			items: [
 				{
-					displayName: 'Marker coordinates',
+					displayName: t('viewOption.markerCoordinates'),
 					type: 'property',
 					key: 'coordinates',
 					filter: (prop: string) => !prop.startsWith('file.'),
-					placeholder: 'Property',
+					placeholder: t('viewOption.property'),
 					default: 'note.location',
 				},
 				{
-					displayName: 'Marker icon',
+					displayName: t('viewOption.markerIcon'),
 					type: 'property',
 					key: 'markerIcon',
 					filter: (prop: string) => !prop.startsWith('file.'),
-					placeholder: 'Property',
+					placeholder: t('viewOption.property'),
 				},
 				{
-					displayName: 'Marker color',
+					displayName: t('viewOption.markerColor'),
 					type: 'property',
 					key: 'markerColor',
 					filter: (prop: string) => !prop.startsWith('file.'),
-					placeholder: 'Property',
+					placeholder: t('viewOption.property'),
 				},
 			]
 		},
 		{
-			displayName: 'Custom background',
+			displayName: t('viewOption.customBackground'),
 			type: 'group',
 			items: [
 				{
-					displayName: 'Map tiles',
+					displayName: t('viewOption.mapTiles'),
 					type: 'multitext',
 					key: 'mapTiles',
 				},
 				{
-					displayName: 'Map tiles in dark mode',
+					displayName: t('viewOption.mapTilesDark'),
 					type: 'multitext',
 					key: 'mapTilesDark',
 				},

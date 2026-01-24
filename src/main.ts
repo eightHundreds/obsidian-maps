@@ -1,6 +1,7 @@
 import { Plugin } from 'obsidian';
 import { MapView, getViewOptions } from './map-view';
 import { MapSettings, DEFAULT_SETTINGS, MapSettingTab } from './settings';
+import { initI18n, t } from './i18n';
 
 const HOVER_SOURCE_ID = 'bases-map';
 
@@ -9,14 +10,15 @@ export default class ObsidianMapsPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+		initI18n();
 
 		this.registerHoverLinkSource(HOVER_SOURCE_ID, {
-			display: 'Map',
+			display: t('map'),
 			defaultMod: false,
 		});
 
 		this.registerBasesView('map', {
-			name: 'Map',
+			name: t('map'),
 			icon: 'lucide-map',
 			factory: (controller, containerEl) => new MapView(controller, containerEl, this),
 			options: () => getViewOptions(),
