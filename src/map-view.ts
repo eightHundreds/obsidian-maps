@@ -2,6 +2,8 @@ import {
 	BasesView,
 	BasesPropertyId,
 	debounce,
+	HoverParent,
+	HoverPopover,
 	Menu,
 	QueryController,
 	Value,
@@ -39,14 +41,15 @@ interface MapConfig {
 
 export const MapViewType = 'map';
 
-export class MapView extends BasesView {
+export class MapView extends BasesView implements HoverParent {
 	type = MapViewType;
 	scrollEl: HTMLElement;
 	containerEl: HTMLElement;
 	mapEl: HTMLElement;
 	plugin: ObsidianMapsPlugin;
+	hoverPopover: HoverPopover | null = null;
 
-	// Internal rendering data
+	// 内部渲染数据
 	private map: Map | null = null;
 	private mapConfig: MapConfig | null = null;
 	private pendingMapState: { center?: LngLatLike, zoom?: number } | null = null;
@@ -54,12 +57,12 @@ export class MapView extends BasesView {
 	private lastConfigSnapshot: string | null = null;
 	private lastEvaluatedCenter: [number, number] = DEFAULT_MAP_CENTER;
 
-	// Managers
+	// 管理器
 	private styleManager: StyleManager;
 	private popupManager: PopupManager;
 	private markerManager: MarkerManager;
 
-	// Static flag to track RTL plugin initialization
+	// 用于跟踪 RTL 插件初始化状态的静态标志
 	private static rtlPluginInitialized = false;
 
 	constructor(controller: QueryController, scrollEl: HTMLElement, plugin: ObsidianMapsPlugin) {
@@ -69,14 +72,14 @@ export class MapView extends BasesView {
 		this.containerEl = scrollEl.createDiv({ cls: 'bases-map-container is-loading', attr: { tabIndex: 0 } });
 		this.mapEl = this.containerEl.createDiv('bases-map');
 
-		// Initialize managers
+		// 初始化管理器
 		this.styleManager = new StyleManager(this.app);
 		this.popupManager = new PopupManager(this.containerEl, this.app);
 		this.markerManager = new MarkerManager(
 			this.app,
 			this.mapEl,
 			this.popupManager,
-			(path, newLeaf) => void this.app.workspace.openLinkText(path, '', newLeaf),
+			this,
 			() => this.data,
 			() => this.mapConfig,
 			(prop) => this.config.getDisplayName(prop)
@@ -84,7 +87,7 @@ export class MapView extends BasesView {
 	}
 
 	onload(): void {
-		// Listen for theme changes to update map tiles
+		// 监听主题变化以更新地图瓦片
 		this.registerEvent(this.app.workspace.on('css-change', this.onThemeChange, this));
 	}
 
@@ -92,7 +95,7 @@ export class MapView extends BasesView {
 		this.destroyMap();
 	}
 
-	/** Reduce flashing due to map re-rendering by debouncing while resizes are still ocurring. */
+	/** 通过防抖减少地图重绘时的闪烁，当窗口大小调整仍在进行时 */
 	private onResizeDebounce = debounce(
 		() => { if (this.map) this.map.resize() },
 		100,
@@ -118,7 +121,7 @@ export class MapView extends BasesView {
 		this.map.setStyle(newStyle);
 		this.markerManager.clearLoadedIcons();
 
-		// Re-add markers after style change since setStyle removes all runtime layers
+		// 样式变化后重新添加标记，因为 setStyle 会移除所有运行时图层
 		this.map.once('styledata', () => {
 			void this.markerManager.updateMarkers(this.data);
 		});
@@ -131,30 +134,30 @@ export class MapView extends BasesView {
 		this.mapConfig.currentTileSetId = tileSetId;
 		this.mapConfig.mapCoordSystem = tileSet.coordSystem || 'wgs84';
 
-		// Update the current tiles
+		// 更新当前瓦片
 		this.mapConfig.mapTiles = tileSet.lightTiles ? [tileSet.lightTiles] : [];
 		this.mapConfig.mapTilesDark = tileSet.darkTiles
 			? [tileSet.darkTiles]
 			: (tileSet.lightTiles ? [tileSet.lightTiles] : []);
 
-		// Save to Base config
+		// 保存到 Base 配置
 		this.config.set('background', tileSetId);
 
-		// Update the map style
+		// 更新地图样式
 		await this.updateMapStyle();
 	}
 
 	private async initializeMap(): Promise<void> {
 		if (this.map) return;
 
-		// Initialize RTL text plugin once
+		// 初始化 RTL 文本插件（仅一次）
 		if (!MapView.rtlPluginInitialized) {
 			try {
-				// Create a blob URL from the bundled RTL plugin code
-				// The plugin needs to run in a worker context
+				// 从打包的 RTL 插件代码创建 blob URL
+				// 该插件需要在 worker 上下文中运行
 				const blob = new Blob([rtlPluginCode], { type: 'application/javascript' });
 				const blobURL = URL.createObjectURL(blob);
-				// Set lazy loading to false - plugin is initialized since code is already bundled
+				// 设置延迟加载为 false - 因为代码已经打包，插件已初始化
 				setRTLTextPlugin(blobURL, false);
 				MapView.rtlPluginInitialized = true;
 			} catch (error) {
@@ -162,24 +165,24 @@ export class MapView extends BasesView {
 			}
 		}
 
-		// Load config first
+		// 首先加载配置
 		const currentTileSetId = this.mapConfig?.currentTileSetId || null;
 		this.mapConfig = this.loadConfig(currentTileSetId);
 
-		// Set initial map height based on context
+		// 根据上下文设置初始地图高度
 		const isEmbedded = this.isEmbedded();
 		if (isEmbedded) {
 			this.mapEl.style.height = this.mapConfig.mapHeight + 'px';
 		}
 		else {
-			// Let CSS handle the height for direct base file views
+			// 对于直接打开的 base 文件视图，让 CSS 处理高度
 			this.mapEl.style.height = '';
 		}
 
-		// Get the map style (may involve fetching remote style JSON)
+		// 获取地图样式（可能涉及获取远程样式 JSON）
 		const mapStyle = await this.styleManager.getMapStyle(this.mapConfig.mapTiles, this.mapConfig.mapTilesDark);
 
-		// Determine initial position: prefer ephemeral state if available, otherwise use config
+		// 确定初始位置：优先使用临时状态，否则使用配置
 		let [centerLat, centerLng] = this.mapConfig.center;
 		if (this.mapConfig.mapCoordSystem === 'gcj02') {
 			[centerLat, centerLng] = wgs84ToGcj02(centerLat, centerLng);
@@ -214,7 +217,7 @@ export class MapView extends BasesView {
 			}
 		}
 
-		// Initialize MapLibre GL JS map with configured tiles or default style
+		// 使用配置的瓦片或默认样式初始化 MapLibre GL JS 地图
 		this.map = new Map({
 			container: this.mapEl,
 			style: mapStyle,
@@ -224,13 +227,13 @@ export class MapView extends BasesView {
 			maxZoom: this.mapConfig.maxZoom,
 		});
 
-		// Set map reference in managers
+		// 在管理器中设置地图引用
 		this.popupManager.setMap(this.map);
 		this.markerManager.setMap(this.map);
 
 		this.map.addControl(new CustomZoomControl(), 'top-right');
 
-		// Add background switcher if multiple tile sets are available
+		// 如果有多个瓦片集，添加背景切换器
 		if (this.plugin.settings.tileSets.length > 1) {
 			const currentId = this.mapConfig.currentTileSetId || this.plugin.settings.tileSets[0]?.id || '';
 			if (currentId) {
@@ -249,7 +252,7 @@ export class MapView extends BasesView {
 			console.warn('Map error:', e);
 		});
 
-		// Ensure the center and zoom are set after map loads (in case the style loading overrides it)
+		// 确保地图加载后设置中心点和缩放级别（以防样式加载覆盖它）
 		this.map.on('load', () => {
 			if (!this.map || !this.mapConfig) return;
 
@@ -286,11 +289,11 @@ export class MapView extends BasesView {
 			}
 		});
 
-		// Hide tooltip on the map element.
+		// 隐藏地图元素上的工具提示
 		this.mapEl.querySelector('canvas')?.style
 			.setProperty('--no-tooltip', 'true');
 
-		// Add context menu to map
+		// 向地图添加右键菜单
 		this.mapEl.addEventListener('contextmenu', (evt) => {
 			evt.preventDefault();
 			this.showMapContextMenu(evt);
@@ -315,20 +318,20 @@ export class MapView extends BasesView {
 		const currentTileSetId = this.mapConfig?.currentTileSetId || null;
 		this.mapConfig = this.loadConfig(currentTileSetId);
 
-		// Check if the evaluated center coordinates have changed
+		// 检查计算后的中心点坐标是否发生变化
 		const centerChanged = this.mapConfig.center[0] !== this.lastEvaluatedCenter[0] ||
 			this.mapConfig.center[1] !== this.lastEvaluatedCenter[1];
 
 		void this.initializeMap().then(async () => {
-			// Apply config to map on first load or when config changes
+			// 首次加载或配置变化时应用配置到地图
 			if (configChanged) {
 				await this.applyConfigToMap(this.lastConfigSnapshot, configSnapshot);
 				this.lastConfigSnapshot = configSnapshot;
 				this.isFirstLoad = false;
 			}
-			// Update center when the evaluated center coordinates change
-			// (e.g., due to formula re-evaluation when active file changes)
-			// But skip if we're restoring ephemeral state
+			// 当计算后的中心点坐标变化时更新中心点
+			// （例如，当活动文件变化时公式重新计算）
+			// 但如果正在恢复临时状态则跳过
 			else if (this.map && !this.isFirstLoad && centerChanged && this.pendingMapState === null) {
 				this.updateCenter();
 			}
@@ -336,6 +339,7 @@ export class MapView extends BasesView {
 			if (this.map && this.data) {
 				await this.markerManager.updateMarkers(this.data);
 
+				// 如有可用的待恢复状态则应用（用于恢复临时状态）
 				if (this.pendingMapState && this.map) {
 					const { center, zoom } = this.pendingMapState;
 					if (center) {
@@ -358,7 +362,7 @@ export class MapView extends BasesView {
 				}
 			}
 
-			// Track state for next comparison
+			// 记录状态以供下次比较
 			if (this.mapConfig) {
 				this.lastEvaluatedCenter = [this.mapConfig.center[0], this.mapConfig.center[1]];
 			}
@@ -398,22 +402,22 @@ export class MapView extends BasesView {
 	private async applyConfigToMap(oldSnapshot: string | null, newSnapshot: string): Promise<void> {
 		if (!this.map || !this.mapConfig) return;
 
-		// Parse snapshots to detect specific changes
+		// 解析快照以检测具体变化
 		const oldConfig = oldSnapshot ? JSON.parse(oldSnapshot) : null;
 		const newConfig = JSON.parse(newSnapshot);
 
-		// Detect what changed
+		// 检测哪些配置发生了变化
 		const centerConfigChanged = oldConfig?.center !== newConfig.center;
 		const zoomConfigChanged = oldConfig?.defaultZoom !== newConfig.defaultZoom;
 		const tilesChanged = JSON.stringify(oldConfig?.mapTiles) !== JSON.stringify(newConfig.mapTiles) ||
 			JSON.stringify(oldConfig?.mapTilesDark) !== JSON.stringify(newConfig.mapTilesDark);
 		const heightChanged = oldConfig?.mapHeight !== newConfig.mapHeight;
 
-		// Update map constraints
+		// 更新地图约束
 		this.map.setMinZoom(this.mapConfig.minZoom);
 		this.map.setMaxZoom(this.mapConfig.maxZoom);
 
-		// Clamp current zoom to new min/max bounds
+		// 将当前缩放级别限制在新的最小/最大范围内
 		const currentZoom = this.map.getZoom();
 		if (currentZoom < this.mapConfig.minZoom) {
 			this.map.setZoom(this.mapConfig.minZoom);
@@ -421,23 +425,23 @@ export class MapView extends BasesView {
 			this.map.setZoom(this.mapConfig.maxZoom);
 		}
 
-		// Skip updating zoom/center if we have pending ephemeral state to restore
-		// (e.g., when navigating back in history to restore the user's last pan/zoom)
+		// 如果有待恢复的临时状态，则跳过更新缩放/中心点
+		// （例如，在历史记录中导航以恢复用户上次的平移/缩放时）
 		const hasEphemeralState = this.pendingMapState !== null;
 
-		// Only update zoom on first load or when zoom config explicitly changed
-		// But skip if we're restoring ephemeral state
+		// 仅在首次加载或缩放配置明确更改时更新缩放
+		// 但如果正在恢复临时状态则跳过
 		if (!hasEphemeralState && (this.isFirstLoad || zoomConfigChanged)) {
 			this.updateZoom();
 		}
 
-		// Update center on first load or when center config changed
-		// But skip if we're restoring ephemeral state
+		// 在首次加载或中心点配置更改时更新中心点
+		// 但如果正在恢复临时状态则跳过
 		if (!hasEphemeralState && (this.isFirstLoad || centerConfigChanged)) {
 			this.updateCenter();
 		}
 
-		// Update map style if tiles configuration changed
+		// 如果瓦片配置更改则更新地图样式
 		if (this.isFirstLoad || tilesChanged) {
 			const newStyle = await this.styleManager.getMapStyle(this.mapConfig.mapTiles, this.mapConfig.mapTilesDark);
 			const currentStyle = this.map.getStyle();
@@ -447,7 +451,7 @@ export class MapView extends BasesView {
 			}
 		}
 
-		// Update map height for embedded views if height changed
+		// 如果高度更改则更新嵌入视图的地图高度
 		if (this.isFirstLoad || heightChanged) {
 			if (this.isEmbedded()) {
 				this.mapEl.style.height = this.mapConfig.mapHeight + 'px';
@@ -455,14 +459,14 @@ export class MapView extends BasesView {
 			else {
 				this.mapEl.style.height = '';
 			}
-			// Resize map after height changes
+			// 高度变化后调整地图大小
 			this.map.resize();
 		}
 	}
 
 	isEmbedded(): boolean {
-		// Check if this map view is embedded in a markdown file rather than opened directly
-		// If the scrollEl has a parent with 'bases-embed' class, it's embedded
+		// 检查此地图视图是否嵌入在 markdown 文件中而不是直接打开
+		// 如果 scrollEl 有一个带有 'bases-embed' 类的父元素，则表示它是嵌入的
 		let element = this.scrollEl.parentElement;
 		while (element) {
 			if (element.hasClass('bases-embed') || element.hasClass('block-language-base')) {
@@ -551,12 +555,12 @@ export class MapView extends BasesView {
 		const value = this.config.get(key);
 		if (!value) return [];
 
-		// Handle array values
+		// 处理数组值
 		if (Array.isArray(value)) {
 			return value.filter(item => typeof item === 'string' && item.trim().length > 0);
 		}
 
-		// Handle single string value
+		// 处理单个字符串值
 		if (typeof value === 'string' && value.trim().length > 0) {
 			return [value.trim()];
 		}
@@ -570,8 +574,8 @@ export class MapView extends BasesView {
 		try {
 			centerConfig = this.config.getEvaluatedFormula(this, 'center');
 		} catch (error) {
-			// Formula evaluation failed (e.g., this.file is null when no active file)
-			// Fall back to raw config value
+			// 公式计算失败（例如，当没有活动文件时 this.file 为 null）
+			// 回退到原始配置值
 			const centerConfigStr = this.config.get('center');
 			if (String.isString(centerConfigStr)) {
 				centerConfig = new StringValue(centerConfigStr);
@@ -581,7 +585,7 @@ export class MapView extends BasesView {
 			}
 		}
 
-		// Support for legacy string format.
+		// 支持旧版字符串格式
 		if (Value.equals(centerConfig, NullValue.value)) {
 			const centerConfigStr = this.config.get('center');
 			if (String.isString(centerConfigStr)) {
@@ -595,7 +599,7 @@ export class MapView extends BasesView {
 	}
 
 	private getConfigSnapshot(): string {
-		// Create a snapshot of config values that affect map display
+		// 创建影响地图显示的配置值快照
 		return JSON.stringify({
 			center: this.config.get('center'),
 			defaultZoom: this.config.get('defaultZoom'),
@@ -618,7 +622,7 @@ export class MapView extends BasesView {
 		let displayLat = Math.round(clickedCoords.lat * 100000) / 100000;
 		let displayLng = Math.round(clickedCoords.lng * 100000) / 100000;
 
-		// Convert from map coords (GCJ-02) to storage coords (WGS-84) if needed
+		// 如需要，从地图坐标 (GCJ-02) 转换为存储坐标 (WGS-84)
 		if (this.mapConfig.mapCoordSystem === 'gcj02') {
 			[displayLat, displayLng] = gcj02ToWgs84(displayLat, displayLng);
 			displayLat = Math.round(displayLat * 100000) / 100000;
@@ -665,7 +669,7 @@ export class MapView extends BasesView {
 
 				this.config.set('center', coordListStr);
 
-				// Convert back to map coords for setCenter
+				// 转换回地图坐标以用于 setCenter
 				let mapLat = displayLat, mapLng = displayLng;
 				if (this.mapConfig?.mapCoordSystem === 'gcj02') {
 					[mapLat, mapLng] = wgs84ToGcj02(displayLat, displayLng);

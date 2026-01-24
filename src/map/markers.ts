@@ -1,4 +1,4 @@
-import { App, BasesEntry, BasesPropertyId, Keymap, Menu, setIcon } from 'obsidian';
+import { App, BasesEntry, BasesPropertyId, HoverParent, Menu, setIcon } from 'obsidian';
 import { Map, LngLatBounds, GeoJSONSource, MapLayerMouseEvent } from 'maplibre-gl';
 import { MapMarker, MapMarkerProperties } from './types';
 import { coordinateFromValue } from './utils';
@@ -14,7 +14,8 @@ export class MarkerManager {
 	private bounds: LngLatBounds | null = null;
 	private loadedIcons: Set<string> = new Set();
 	private popupManager: PopupManager;
-	private onOpenFile: (path: string, newLeaf: boolean) => void;
+	private hoverParent: HoverParent;
+	private hoverAnchorEl: HTMLAnchorElement | null = null;
 	private getData: () => any;
 	private getMapConfig: () => any;
 	private getDisplayName: (prop: BasesPropertyId) => string;
@@ -23,7 +24,7 @@ export class MarkerManager {
 		app: App,
 		mapEl: HTMLElement,
 		popupManager: PopupManager,
-		onOpenFile: (path: string, newLeaf: boolean) => void,
+		hoverParent: HoverParent,
 		getData: () => any,
 		getMapConfig: () => any,
 		getDisplayName: (prop: BasesPropertyId) => string
@@ -31,7 +32,7 @@ export class MarkerManager {
 		this.app = app;
 		this.mapEl = mapEl;
 		this.popupManager = popupManager;
-		this.onOpenFile = onOpenFile;
+		this.hoverParent = hoverParent;
 		this.getData = getData;
 		this.getMapConfig = getMapConfig;
 		this.getDisplayName = getDisplayName;
@@ -39,6 +40,25 @@ export class MarkerManager {
 
 	setMap(map: Map | null): void {
 		this.map = map;
+	}
+
+	private getOrCreateHoverAnchor(): HTMLAnchorElement | null {
+		if (!this.map) return null;
+		const container = this.map.getContainer();
+		if (!this.hoverAnchorEl) {
+			const el = document.createElement('a');
+			el.className = 'internal-link';
+			el.href = '#';
+			el.tabIndex = -1;
+			el.style.position = 'absolute';
+			el.style.width = '1px';
+			el.style.height = '1px';
+			el.style.pointerEvents = 'none';
+			el.style.opacity = '0';
+			container.appendChild(el);
+			this.hoverAnchorEl = el;
+		}
+		return this.hoverAnchorEl;
 	}
 
 	getMarkers(): MapMarker[] {
@@ -59,7 +79,7 @@ export class MarkerManager {
 			return;
 		}
 
-		// Collect valid marker data
+		// 收集有效的标记点数据
 		const validMarkers: MapMarker[] = [];
 		for (const entry of data.data) {
 			if (!entry) continue;
@@ -85,6 +105,7 @@ export class MarkerManager {
 
 		const coordSystem: CoordSystem = mapConfig?.mapCoordSystem || 'wgs84';
 
+		// 计算所有标记点的边界范围
 		const bounds = this.bounds = new LngLatBounds();
 		validMarkers.forEach(markerData => {
 			let [lat, lng] = markerData.coordinates;
@@ -94,10 +115,11 @@ export class MarkerManager {
 			bounds.extend([lng, lat]);
 		});
 
+		// 加载所有自定义图标并创建 GeoJSON 要素
 		await this.loadCustomIcons(validMarkers);
 		const features = this.createGeoJSONFeatures(validMarkers);
 
-		// Update or create the markers source
+		// 更新或创建标记点数据源
 		const source = this.map.getSource('markers') as GeoJSONSource | undefined;
 		if (source) {
 			source.setData({
@@ -105,7 +127,7 @@ export class MarkerManager {
 				features,
 			});
 		} else {
-			// Add source if it doesn't exist
+			// 如果数据源不存在则添加
 			this.map.addSource('markers', {
 				type: 'geojson',
 				data: {
@@ -114,7 +136,7 @@ export class MarkerManager {
 				},
 			});
 
-			// Add layers for markers (icon + pin)
+			// 添加标记点图层（图标 + 图钉）
 			this.addMarkerLayers();
 			this.setupMarkerInteractions();
 		}
@@ -128,10 +150,10 @@ export class MarkerManager {
 			const value = entry.getValue(mapConfig.markerIconProp);
 			if (!value || !value.isTruthy()) return null;
 
-			// Extract the icon name from the value
+			// 从值中提取图标名称
 			const iconString = value.toString().trim();
 
-			// Handle null/empty/invalid cases - return null to show default marker
+			// 处理 null/空/无效情况 - 返回 null 以显示默认标记
 			if (!iconString || iconString.length === 0 || iconString === 'null' || iconString === 'undefined') {
 				return null;
 			}
@@ -139,7 +161,7 @@ export class MarkerManager {
 			return iconString;
 		}
 		catch (error) {
-			// Log as warning instead of error - this is not critical
+			// 作为警告而非错误记录 - 这不是关键问题
 			console.warn(`Could not extract icon for ${entry.file.name}. The marker icon property should be a simple text value (e.g., "map", "star").`, error);
 			return null;
 		}
@@ -153,15 +175,15 @@ export class MarkerManager {
 			const value = entry.getValue(mapConfig.markerColorProp);
 			if (!value || !value.isTruthy()) return null;
 
-			// Extract the color value from the property
+			// 从属性中提取颜色值
 			const colorString = value.toString().trim();
 
-			// Return the color as-is, let CSS handle validation
-			// Supports: hex (#ff0000), rgb/rgba, hsl/hsla, CSS color names, and CSS custom properties (var(--color-name))
+			// 原样返回颜色，让 CSS 处理验证
+			// 支持: hex (#ff0000), rgb/rgba, hsl/hsla, CSS 颜色名称, 和 CSS 自定义属性 (var(--color-name))
 			return colorString;
 		}
 		catch (error) {
-			// Log as warning instead of error - this is not critical
+			// 作为警告而非错误记录 - 这不是关键问题
 			console.warn(`Could not extract color for ${entry.file.name}. The marker color property should be a simple text value (e.g., "#ff0000", "red", "var(--color-accent)").`);
 			return null;
 		}
@@ -170,7 +192,7 @@ export class MarkerManager {
 	private async loadCustomIcons(markers: MapMarker[]): Promise<void> {
 		if (!this.map) return;
 
-		// Collect all unique icon+color combinations that need to be loaded
+		// 收集所有需要加载的唯一图标+颜色组合
 		const compositeImagesToLoad: Array<{ icon: string | null; color: string }> = [];
 		const uniqueKeys = new Set<string>();
 
@@ -187,14 +209,14 @@ export class MarkerManager {
 			}
 		}
 
-		// Create composite images for each unique icon+color combination
+		// 为每个唯一的图标+颜色组合创建合成图像
 		for (const { icon, color } of compositeImagesToLoad) {
 			try {
 				const compositeKey = this.getCompositeImageKey(icon, color);
 				const img = await this.createCompositeMarkerImage(icon, color);
 
 				if (this.map) {
-					// Force update of the image on theme change
+					// 在主题变化时强制更新图像
 					if (this.map.hasImage(compositeKey)) {
 						this.map.removeImage(compositeKey);
 					}
@@ -212,29 +234,29 @@ export class MarkerManager {
 	}
 
 	private resolveColor(color: string): string {
-		// Create a temporary element to resolve CSS variables
+		// 创建临时元素以解析 CSS 变量
 		const tempEl = document.createElement('div');
 		tempEl.style.color = color;
 		tempEl.style.display = 'none';
 		document.body.appendChild(tempEl);
 
-		// Get the computed color value
+		// 获取计算后的颜色值
 		const computedColor = getComputedStyle(tempEl).color;
 
-		// Clean up
+		// 清理临时元素
 		tempEl.remove();
 
 		return computedColor;
 	}
 
 	private async createCompositeMarkerImage(icon: string | null, color: string): Promise<HTMLImageElement> {
-		// Resolve CSS variables to actual color values
+		// 将 CSS 变量解析为实际颜色值
 		const resolvedColor = this.resolveColor(color);
 		const resolvedIconColor = this.resolveColor('var(--bases-map-marker-icon-color)');
 
-		// Create a high-resolution canvas for crisp rendering on retina displays
-		const scale = 4; // 4x resolution for crisp display
-		const size = 48 * scale; // High-res canvas
+		// 创建高分辨率画布以在视网膜显示屏上清晰渲染
+		const scale = 4; // 4倍分辨率以获得清晰显示
+		const size = 48 * scale; // 高分辨率画布
 		const canvas = document.createElement('canvas');
 		canvas.width = size;
 		canvas.height = size;
@@ -244,11 +266,11 @@ export class MarkerManager {
 			throw new Error('Failed to get canvas context');
 		}
 
-		// Enable high-quality rendering
+		// 启用高质量渲染
 		ctx.imageSmoothingEnabled = true;
 		ctx.imageSmoothingQuality = 'high';
 
-		// Draw the circle background (scaled up)
+		// 绘制圆形背景（放大）
 		const centerX = size / 2;
 		const centerY = size / 2;
 		const radius = 12 * scale;
@@ -262,9 +284,9 @@ export class MarkerManager {
 		ctx.lineWidth = 1 * scale;
 		ctx.stroke();
 
-		// Draw the icon or dot
+		// 绘制图标或圆点
 		if (icon) {
-			// Load and draw custom icon
+			// 加载并绘制自定义图标
 			const iconDiv = createDiv();
 			setIcon(iconDiv, icon);
 			const svgEl = iconDiv.querySelector('svg');
@@ -281,7 +303,7 @@ export class MarkerManager {
 
 				await new Promise<void>((resolve, reject) => {
 					iconImg.onload = () => {
-						// Draw icon centered and scaled
+						// 居中绘制并缩放图标
 						const iconSize = radius * 1.2;
 						ctx.drawImage(
 							iconImg,
@@ -296,7 +318,7 @@ export class MarkerManager {
 				});
 			}
 		} else {
-			// Draw a dot
+			// 绘制圆点
 			const dotRadius = 4 * scale;
 			ctx.fillStyle = resolvedIconColor;
 			ctx.beginPath();
@@ -304,7 +326,7 @@ export class MarkerManager {
 			ctx.fill();
 		}
 
-		// Convert canvas to image
+		// 将画布转换为图像
 		return new Promise((resolve, reject) => {
 			canvas.toBlob((blob) => {
 				if (!blob) {
@@ -354,7 +376,7 @@ export class MarkerManager {
 	private addMarkerLayers(): void {
 		if (!this.map) return;
 
-		// Add a single symbol layer for composite marker images
+		// 添加用于合成标记图像的单个符号图层
 		this.map.addLayer({
 			id: 'marker-pins',
 			type: 'symbol',
@@ -365,9 +387,9 @@ export class MarkerManager {
 					'interpolate',
 					['linear'],
 					['zoom'],
-					0, 0.12,   // Very small
+					0, 0.12,   // 非常小
 					4, 0.18,
-					14, 0.22,  // Normal size
+					14, 0.22,  // 正常大小
 					18, 0.24
 				],
 				'icon-allow-overlap': true,
@@ -380,7 +402,7 @@ export class MarkerManager {
 	private setupMarkerInteractions(): void {
 		if (!this.map) return;
 
-		// Change cursor on hover
+		// 悬停时改变光标
 		this.map.on('mouseenter', 'marker-pins', () => {
 			if (this.map) this.map.getCanvas().style.cursor = 'pointer';
 		});
@@ -389,7 +411,7 @@ export class MarkerManager {
 			if (this.map) this.map.getCanvas().style.cursor = '';
 		});
 
-		// Handle hover to show popup
+		// 处理悬停以显示弹窗
 		this.map.on('mouseenter', 'marker-pins', (e: MapLayerMouseEvent) => {
 			if (!e.features || e.features.length === 0) return;
 			const feature = e.features[0];
@@ -416,24 +438,35 @@ export class MarkerManager {
 			}
 		});
 
-		// Handle mouseleave to hide popup
+		// 处理鼠标离开以隐藏弹窗
 		this.map.on('mouseleave', 'marker-pins', () => {
 			this.popupManager.hidePopup();
 		});
 
-		// Handle click to open file
+		// 处理点击以显示可编辑的 hover popover（类似 Cmd + 鼠标悬停链接）
 		this.map.on('click', 'marker-pins', (e: MapLayerMouseEvent) => {
 			if (!e.features || e.features.length === 0) return;
 			const feature = e.features[0];
 			const entryIndex = feature.properties?.entryIndex;
 			if (entryIndex !== undefined && this.markers[entryIndex]) {
 				const markerData = this.markers[entryIndex];
-				const newLeaf = e.originalEvent ? Boolean(Keymap.isModEvent(e.originalEvent)) : false;
-				this.onOpenFile(markerData.entry.file.path, newLeaf);
+				const anchorEl = this.getOrCreateHoverAnchor();
+				if (!anchorEl) return;
+				if (typeof e.point?.x === 'number') anchorEl.style.left = `${e.point.x}px`;
+				if (typeof e.point?.y === 'number') anchorEl.style.top = `${e.point.y}px`;
+
+				this.app.workspace.trigger(
+					'link-hover',
+					this.hoverParent,
+					anchorEl,
+					markerData.entry.file.path,
+					markerData.entry.file.path,
+					{ mode: 'source' }
+				);
 			}
 		});
 
-		// Handle right-click context menu
+		// 处理右键上下文菜单
 		this.map.on('contextmenu', 'marker-pins', (e: MapLayerMouseEvent) => {
 			e.preventDefault();
 			if (!e.features || e.features.length === 0) return;
@@ -448,7 +481,7 @@ export class MarkerManager {
 				const menu = Menu.forEvent(e.originalEvent);
 				this.app.workspace.handleLinkContextMenu(menu, file.path, '');
 
-				// Add copy coordinates option
+				// 添加复制坐标选项
 				menu.addItem(item => item
 					.setSection('action')
 					.setTitle('Copy coordinates')
@@ -467,22 +500,5 @@ export class MarkerManager {
 			}
 		});
 
-		// Handle hover for link preview - similar to cards view
-		this.map.on('mouseover', 'marker-pins', (e: MapLayerMouseEvent) => {
-			if (!e.features || e.features.length === 0) return;
-			const feature = e.features[0];
-			const entryIndex = feature.properties?.entryIndex;
-			if (entryIndex !== undefined && this.markers[entryIndex]) {
-				const markerData = this.markers[entryIndex];
-				this.app.workspace.trigger('hover-link', {
-					event: e.originalEvent,
-					source: 'bases',
-					hoverParent: this.app.renderContext,
-					targetEl: this.mapEl,
-					linktext: markerData.entry.file.path,
-				});
-			}
-		});
 	}
 }
-

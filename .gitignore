@@ -24,3 +24,4 @@ data.json
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
 test/vault/.obsidian/plugins/maps/main.js
+app.js

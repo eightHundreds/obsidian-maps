@@ -1,11 +1,14 @@
 import { App, Modal, PluginSettingTab, Setting, setIcon, setTooltip } from 'obsidian';
 import ObsidianMapsPlugin from './main';
 
+export type CoordSystem = 'wgs84' | 'gcj02';
+
 export interface TileSet {
 	id: string;
 	name: string;
 	lightTiles: string;
 	darkTiles: string;
+	coordSystem: CoordSystem;
 }
 
 export interface MapSettings {
@@ -15,6 +18,34 @@ export interface MapSettings {
 export const DEFAULT_SETTINGS: MapSettings = {
 	tileSets: [],
 };
+
+interface TilePreset {
+	name: string;
+	lightTiles: string;
+	darkTiles: string;
+	coordSystem: CoordSystem;
+}
+
+const TILE_PRESETS: TilePreset[] = [
+	{
+		name: 'Amap Vector',
+		lightTiles: 'https://wprd0{1-4}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=7',
+		darkTiles: '',
+		coordSystem: 'gcj02',
+	},
+	{
+		name: 'Amap Satellite',
+		lightTiles: 'https://webst0{1-4}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
+		darkTiles: '',
+		coordSystem: 'gcj02',
+	},
+	{
+		name: 'Amap Satellite + Roads',
+		lightTiles: 'https://wprd0{1-4}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=8',
+		darkTiles: '',
+		coordSystem: 'gcj02',
+	},
+];
 
 class TileSetModal extends Modal {
 	tileSet: TileSet;
@@ -28,7 +59,8 @@ class TileSetModal extends Modal {
 			id: Date.now().toString(),
 			name: '',
 			lightTiles: '',
-			darkTiles: ''
+			darkTiles: '',
+			coordSystem: 'wgs84'
 		};
 		this.onSave = onSave;
 	}
@@ -72,6 +104,18 @@ class TileSetModal extends Modal {
 				})
 			);
 
+		new Setting(contentEl)
+			.setName('Coordinate system')
+			.setDesc('GCJ-02 for Chinese maps (Amap, Tencent). WGS-84 for international maps.')
+			.addDropdown(dropdown => dropdown
+				.addOption('wgs84', 'WGS-84 (International)')
+				.addOption('gcj02', 'GCJ-02 (China)')
+				.setValue(this.tileSet.coordSystem || 'wgs84')
+				.onChange(value => {
+					this.tileSet.coordSystem = value as CoordSystem;
+				})
+			);
+
 		const buttonContainerEl = modalEl.createDiv('modal-button-container');
 		
 		buttonContainerEl.createEl('button', { cls: 'mod-cta', text: 'Save' })
@@ -107,9 +151,29 @@ export class MapSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setHeading()
 			.setName('Backgrounds')
+			.addDropdown(dropdown => {
+				dropdown.addOption('', 'Add from preset...');
+				TILE_PRESETS.forEach((preset, i) => {
+					dropdown.addOption(i.toString(), preset.name);
+				});
+				dropdown.onChange(async value => {
+					if (value === '') return;
+					const preset = TILE_PRESETS[parseInt(value, 10)];
+					if (preset) {
+						this.plugin.settings.tileSets.push({
+							id: Date.now().toString(),
+							name: preset.name,
+							lightTiles: preset.lightTiles,
+							darkTiles: preset.darkTiles,
+							coordSystem: preset.coordSystem,
+						});
+						await this.plugin.saveSettings();
+						this.display();
+					}
+				});
+			})
 			.addButton(button => button
-				.setButtonText('Add background')
-				.setCta()
+				.setButtonText('Add custom')
 				.onClick(() => {
 					new TileSetModal(this.app, null, async (tileSet) => {
 						this.plugin.settings.tileSets.push(tileSet);
@@ -119,7 +183,6 @@ export class MapSettingTab extends PluginSettingTab {
 				})
 			);
 
-		// Display existing tile sets as a list
 		const listContainer = containerEl.createDiv('map-tileset-list');
 		
 		this.plugin.settings.tileSets.forEach((tileSet, index) => {
