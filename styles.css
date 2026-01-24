@@ -3,6 +3,76 @@ body {
 	--bases-map-marker-background: var(--interactive-accent);
 	--bases-map-marker-icon-color: white;
 	--bases-map-blend-mode: normal;
+	--bases-map-user-location-color: #4285f4;
+}
+
+/* User location marker */
+.bases-map-user-location {
+	width: 24px;
+	height: 24px;
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.bases-map-user-location-dot {
+	width: 14px;
+	height: 14px;
+	background-color: var(--bases-map-user-location-color);
+	border: 2px solid white;
+	border-radius: 50%;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+	z-index: 1;
+}
+
+.bases-map-user-location-pulse {
+	position: absolute;
+	width: 24px;
+	height: 24px;
+	background-color: var(--bases-map-user-location-color);
+	border-radius: 50%;
+	opacity: 0.4;
+	animation: bases-map-location-pulse 2s ease-out infinite;
+}
+
+@keyframes bases-map-location-pulse {
+	0% {
+		transform: scale(0.8);
+		opacity: 0.4;
+	}
+	70% {
+		transform: scale(2);
+		opacity: 0;
+	}
+	100% {
+		transform: scale(2);
+		opacity: 0;
+	}
+}
+
+/* Locate control button */
+.maplibregl-ctrl-locate {
+	cursor: pointer;
+	color: var(--text-muted);
+	transition: color 0.15s ease;
+}
+
+.maplibregl-ctrl-locate:hover {
+	color: var(--text-normal);
+}
+
+.maplibregl-ctrl-locate.is-locating {
+	color: var(--text-accent);
+	animation: maplibregl-spin 1.5s linear infinite;
+}
+
+.maplibregl-ctrl-locate.is-active {
+	color: var(--bases-map-user-location-color);
+}
+
+.maplibregl-ctrl-locate.is-error {
+	color: var(--text-error);
 }
 
 /* Settings styles */

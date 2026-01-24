@@ -13,10 +13,12 @@ export interface TileSet {
 
 export interface MapSettings {
 	tileSets: TileSet[];
+	enableGeolocation: boolean;
 }
 
 export const DEFAULT_SETTINGS: MapSettings = {
 	tileSets: [],
+	enableGeolocation: true,
 };
 
 interface TilePreset {
@@ -147,6 +149,17 @@ export class MapSettingTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
+
+		new Setting(containerEl)
+			.setName('Enable geolocation')
+			.setDesc('Show your current location on the map. Requires location permission.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.enableGeolocation)
+				.onChange(async value => {
+					this.plugin.settings.enableGeolocation = value;
+					await this.plugin.saveSettings();
+				})
+			);
 
 		new Setting(containerEl)
 			.setHeading()

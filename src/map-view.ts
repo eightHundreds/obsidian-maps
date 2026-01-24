@@ -16,9 +16,11 @@ import type ObsidianMapsPlugin from './main';
 import { DEFAULT_MAP_HEIGHT, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from './map/constants';
 import { CustomZoomControl } from './map/controls/zoom-control';
 import { BackgroundSwitcherControl } from './map/controls/background-switcher';
+import { LocateControl } from './map/controls/locate-control';
 import { StyleManager } from './map/style';
 import { PopupManager } from './map/popup';
 import { MarkerManager } from './map/markers';
+import { GeolocationManager } from './map/geolocation';
 import { hasOwnProperty, coordinateFromValue } from './map/utils';
 import { rtlPluginCode } from './map/rtl-plugin-code';
 import { wgs84ToGcj02, gcj02ToWgs84 } from './map/coords';
@@ -61,6 +63,8 @@ export class MapView extends BasesView implements HoverParent {
 	private styleManager: StyleManager;
 	private popupManager: PopupManager;
 	private markerManager: MarkerManager;
+	private geolocationManager: GeolocationManager;
+	private locateControl: LocateControl | null = null;
 
 	// 用于跟踪 RTL 插件初始化状态的静态标志
 	private static rtlPluginInitialized = false;
@@ -84,6 +88,7 @@ export class MapView extends BasesView implements HoverParent {
 			() => this.mapConfig,
 			(prop) => this.config.getDisplayName(prop)
 		);
+		this.geolocationManager = new GeolocationManager();
 	}
 
 	onload(): void {
@@ -233,7 +238,19 @@ export class MapView extends BasesView implements HoverParent {
 
 		this.map.addControl(new CustomZoomControl(), 'top-right');
 
-		// 如果有多个瓦片集，添加背景切换器
+		if (this.plugin.settings.enableGeolocation && this.geolocationManager.isSupported()) {
+			this.geolocationManager.setMap(this.map);
+			this.geolocationManager.setCoordSystem(this.mapConfig.mapCoordSystem);
+			
+			this.locateControl = new LocateControl(() => {
+				void this.geolocationManager.locateAndFlyTo();
+			});
+			this.geolocationManager.setOnStatusChange((status) => {
+				this.locateControl?.setStatus(status);
+			});
+			this.map.addControl(this.locateControl, 'top-right');
+		}
+
 		if (this.plugin.settings.tileSets.length > 1) {
 			const currentId = this.mapConfig.currentTileSetId || this.plugin.settings.tileSets[0]?.id || '';
 			if (currentId) {
@@ -302,6 +319,8 @@ export class MapView extends BasesView implements HoverParent {
 
 	private destroyMap(): void {
 		this.popupManager.destroy();
+		this.geolocationManager.cleanup();
+		this.locateControl = null;
 		if (this.map) {
 			this.map.remove();
 			this.map = null;
