@@ -1,6 +1,6 @@
 import { App, Modal, PluginSettingTab, Setting, setIcon, setTooltip } from 'obsidian';
 import ObsidianMapsPlugin from './main';
-import { t } from './i18n';
+import { t, Translations } from './i18n';
 
 export type CoordSystem = 'wgs84' | 'gcj02';
 
@@ -23,7 +23,7 @@ export const DEFAULT_SETTINGS: MapSettings = {
 };
 
 interface TilePreset {
-	name: string;
+	nameKey: keyof Translations;
 	lightTiles: string;
 	darkTiles: string;
 	coordSystem: CoordSystem;
@@ -31,19 +31,19 @@ interface TilePreset {
 
 const TILE_PRESETS: TilePreset[] = [
 	{
-		name: 'Amap Vector',
+		nameKey: 'preset.amapVector',
 		lightTiles: 'https://wprd0{1-4}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=7',
 		darkTiles: '',
 		coordSystem: 'gcj02',
 	},
 	{
-		name: 'Amap Satellite',
+		nameKey: 'preset.amapSatellite',
 		lightTiles: 'https://webst0{1-4}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
 		darkTiles: '',
 		coordSystem: 'gcj02',
 	},
 	{
-		name: 'Amap Satellite + Roads',
+		nameKey: 'preset.amapSatelliteRoads',
 		lightTiles: 'https://wprd0{1-4}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=8',
 		darkTiles: '',
 		coordSystem: 'gcj02',
@@ -164,59 +164,79 @@ export class MapSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setHeading()
-			.setName(t('settings.backgrounds'))
-			.addDropdown(dropdown => {
-				dropdown.addOption('', t('settings.addFromPreset'));
-				TILE_PRESETS.forEach((preset, i) => {
-					dropdown.addOption(i.toString(), preset.name);
+			.setName(t('settings.backgrounds'));
+
+		containerEl.createEl('p', {
+			cls: 'setting-item-description map-settings-section-desc',
+			text: t('settings.backgroundsDesc')
+		});
+
+		const addButtonsContainer = containerEl.createDiv('map-settings-add-buttons');
+		
+		const presetSelect = addButtonsContainer.createEl('select', { cls: 'dropdown' });
+		presetSelect.createEl('option', { value: '', text: t('settings.addFromPreset') });
+		TILE_PRESETS.forEach((preset, i) => {
+			presetSelect.createEl('option', { value: i.toString(), text: t(preset.nameKey) });
+		});
+		presetSelect.addEventListener('change', async () => {
+			const value = presetSelect.value;
+			if (value === '') return;
+			const preset = TILE_PRESETS[parseInt(value, 10)];
+			if (preset) {
+				this.plugin.settings.tileSets.push({
+					id: Date.now().toString(),
+					name: t(preset.nameKey),
+					lightTiles: preset.lightTiles,
+					darkTiles: preset.darkTiles,
+					coordSystem: preset.coordSystem,
 				});
-				dropdown.onChange(async value => {
-					if (value === '') return;
-					const preset = TILE_PRESETS[parseInt(value, 10)];
-					if (preset) {
-						this.plugin.settings.tileSets.push({
-							id: Date.now().toString(),
-							name: preset.name,
-							lightTiles: preset.lightTiles,
-							darkTiles: preset.darkTiles,
-							coordSystem: preset.coordSystem,
-						});
-						await this.plugin.saveSettings();
-						this.display();
-					}
-				});
-			})
-			.addButton(button => button
-				.setButtonText(t('settings.addCustom'))
-				.onClick(() => {
-					new TileSetModal(this.app, null, async (tileSet) => {
-						this.plugin.settings.tileSets.push(tileSet);
-						await this.plugin.saveSettings();
-						this.display();
-					}).open();
-				})
-			);
+				await this.plugin.saveSettings();
+				this.display();
+			}
+		});
+
+		const customBtn = addButtonsContainer.createEl('button', { 
+			text: t('settings.addCustom')
+		});
+		customBtn.addEventListener('click', () => {
+			new TileSetModal(this.app, null, async (tileSet) => {
+				this.plugin.settings.tileSets.push(tileSet);
+				await this.plugin.saveSettings();
+				this.display();
+			}).open();
+		});
 
 		const listContainer = containerEl.createDiv('map-tileset-list');
 		
-		this.plugin.settings.tileSets.forEach((tileSet, index) => {
-			this.displayTileSetItem(listContainer, tileSet, index);
-		});
-
 		if (this.plugin.settings.tileSets.length === 0) {
 			listContainer.createDiv({
-				cls: 'mobile-option-setting-item',
+				cls: 'map-tileset-empty',
 				text: t('settings.noBackgrounds')
+			});
+		} else {
+			this.plugin.settings.tileSets.forEach((tileSet, index) => {
+				this.displayTileSetItem(listContainer, tileSet, index);
 			});
 		}
 	}
 
 	private displayTileSetItem(containerEl: HTMLElement, tileSet: TileSet, index: number): void {
-		const itemEl = containerEl.createDiv('mobile-option-setting-item');
+		const itemEl = containerEl.createDiv('map-tileset-item');
 
-		itemEl.createSpan({ cls: 'mobile-option-setting-item-name', text: tileSet.name || t('settings.untitled') });
+		const infoEl = itemEl.createDiv('map-tileset-item-info');
+		
+		const iconEl = infoEl.createDiv('map-tileset-item-icon');
+		setIcon(iconEl, 'map');
 
-		itemEl.createDiv('clickable-icon', el => {
+		const textEl = infoEl.createDiv('map-tileset-item-text');
+		textEl.createDiv({ cls: 'map-tileset-item-name', text: tileSet.name || t('settings.untitled') });
+		
+		const coordLabel = tileSet.coordSystem === 'gcj02' ? t('modal.coordGcj02') : t('modal.coordWgs84');
+		textEl.createDiv({ cls: 'map-tileset-item-meta', text: coordLabel });
+
+		const actionsEl = itemEl.createDiv('map-tileset-item-actions');
+
+		actionsEl.createDiv('clickable-icon', el => {
 			setIcon(el, 'pencil');
 			setTooltip(el, t('settings.edit'));
 			el.addEventListener('click', () => {
@@ -228,7 +248,7 @@ export class MapSettingTab extends PluginSettingTab {
 			});
 		});
 
-		itemEl.createDiv('clickable-icon', el => {
+		actionsEl.createDiv('clickable-icon', el => {
 			setIcon(el, 'trash-2');
 			setTooltip(el, t('settings.delete'));
 			el.addEventListener('click', async () => {

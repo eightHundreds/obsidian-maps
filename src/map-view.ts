@@ -26,6 +26,7 @@ import { rtlPluginCode } from './map/rtl-plugin-code';
 import { wgs84ToGcj02, gcj02ToWgs84 } from './map/coords';
 import type { CoordSystem, TileSet } from './settings';
 import { t } from './i18n';
+import { ICON_PICKER_TYPE, COLOR_PICKER_TYPE } from './property-types';
 
 interface MapConfig {
 	coordinatesProp: BasesPropertyId | null;
@@ -500,9 +501,9 @@ export class MapView extends BasesView implements HoverParent {
 	}
 
 	private loadConfig(currentTileSetId: string | null): MapConfig {
-		const coordinatesProp = this.config.getAsPropertyId('coordinates');
-		const markerIconProp = this.config.getAsPropertyId('markerIcon');
-		const markerColorProp = this.config.getAsPropertyId('markerColor');
+		const coordinatesProp = this.config.getAsPropertyId('coordinates') ?? 'note.location';
+		const markerIconProp = this.config.getAsPropertyId('markerIcon') ?? 'note.icon';
+		const markerColorProp = this.config.getAsPropertyId('markerColor') ?? 'note.color';
 
 		const minZoom = this.getNumericConfig('minZoom', 0, 0, 24);
 		const maxZoom = this.getNumericConfig('maxZoom', 18, 0, 24);
@@ -755,6 +756,35 @@ export class MapView extends BasesView implements HoverParent {
 			zoom: this.map.getZoom(),
 		};
 	}
+
+	private ensurePropertyTypes(): void {
+		const metadataTypeManager = (this.plugin.app as unknown as {
+			metadataTypeManager: {
+				setType: (property: string, type: string) => void;
+				getAssignedType: (property: string) => string | null;
+			}
+		}).metadataTypeManager;
+
+		if (!metadataTypeManager) return;
+
+		if (this.mapConfig?.markerIconProp) {
+			const iconKey = this.mapConfig.markerIconProp.startsWith('note.')
+				? this.mapConfig.markerIconProp.slice(5)
+				: this.mapConfig.markerIconProp;
+			if (!metadataTypeManager.getAssignedType(iconKey)) {
+				metadataTypeManager.setType(iconKey, ICON_PICKER_TYPE);
+			}
+		}
+
+		if (this.mapConfig?.markerColorProp) {
+			const colorKey = this.mapConfig.markerColorProp.startsWith('note.')
+				? this.mapConfig.markerColorProp.slice(5)
+				: this.mapConfig.markerColorProp;
+			if (!metadataTypeManager.getAssignedType(colorKey)) {
+				metadataTypeManager.setType(colorKey, COLOR_PICKER_TYPE);
+			}
+		}
+	}
 }
 
 export function getViewOptions(): ViewOption[] {
@@ -808,7 +838,7 @@ export function getViewOptions(): ViewOption[] {
 			]
 		},
 		{
-			displayName: t('viewOption.markers'),
+		displayName: t('viewOption.markers'),
 			type: 'group',
 			items: [
 				{
@@ -825,6 +855,7 @@ export function getViewOptions(): ViewOption[] {
 					key: 'markerIcon',
 					filter: (prop: string) => !prop.startsWith('file.'),
 					placeholder: t('viewOption.property'),
+					default: 'note.icon'
 				},
 				{
 					displayName: t('viewOption.markerColor'),
@@ -832,6 +863,7 @@ export function getViewOptions(): ViewOption[] {
 					key: 'markerColor',
 					filter: (prop: string) => !prop.startsWith('file.'),
 					placeholder: t('viewOption.property'),
+					default: 'note.color'
 				},
 			]
 		},

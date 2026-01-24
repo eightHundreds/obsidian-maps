@@ -4,19 +4,20 @@
     "type": "split",
     "children": [
       {
-        "id": "3a8e5b2bf6505e52",
+        "id": "6b25cb13a9fae69c",
         "type": "tabs",
         "children": [
           {
-            "id": "bef98ccb80eb4954",
+            "id": "60e8547f69a0e1c9",
             "type": "leaf",
             "state": {
-              "type": "bases",
+              "type": "markdown",
               "state": {
-                "file": "未命名.base",
-                "viewName": "视图"
+                "file": "未命名.md",
+                "mode": "source",
+                "source": false
               },
-              "icon": "lucide-map",
+              "icon": "lucide-file",
               "title": "未命名"
             }
           }
@@ -179,9 +180,25 @@
       "bases:新建数据库": false
     }
   },
-  "active": "bef98ccb80eb4954",
+  "active": "60e8547f69a0e1c9",
   "lastOpenFiles": [
-    "1231.md",
-    "未命名.base"
+    "未命名 4.base",
+    "未命名 8.md",
+    "未命名 7.md",
+    "我的老宅.md",
+    "未命名 3.base",
+    "未命名 2.base",
+    "未命名 6.md",
+    "未命名 5.md",
+    "未命名 4.md",
+    "未命名 1.base",
+    "未命名 3.md",
+    "未命名.base",
+    "未命名 1.md",
+    "未命名 2.md",
+    "我的地盘.md",
+    "未命名.md",
+    "123123.md",
+    "1231.md"
   ]
 }

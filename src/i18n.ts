@@ -1,10 +1,11 @@
 export type Locale = 'en' | 'zh';
 
-interface Translations {
+export interface Translations {
 	'map': string;
 	'settings.enableGeolocation': string;
 	'settings.enableGeolocationDesc': string;
 	'settings.backgrounds': string;
+	'settings.backgroundsDesc': string;
 	'settings.addFromPreset': string;
 	'settings.addCustom': string;
 	'settings.noBackgrounds': string;
@@ -51,6 +52,9 @@ interface Translations {
 	'viewOption.mapTilesDark': string;
 	'propertyType.icon': string;
 	'propertyType.color': string;
+	'preset.amapVector': string;
+	'preset.amapSatellite': string;
+	'preset.amapSatelliteRoads': string;
 }
 
 const en: Translations = {
@@ -58,6 +62,7 @@ const en: Translations = {
 	'settings.enableGeolocation': 'Enable geolocation',
 	'settings.enableGeolocationDesc': 'Show your current location on the map. Requires location permission.',
 	'settings.backgrounds': 'Backgrounds',
+	'settings.backgroundsDesc': 'Add background tile sets available to all maps.',
 	'settings.addFromPreset': 'Add from preset...',
 	'settings.addCustom': 'Add custom',
 	'settings.noBackgrounds': 'Add background sets available to all maps.',
@@ -104,6 +109,9 @@ const en: Translations = {
 	'viewOption.mapTilesDark': 'Map tiles in dark mode',
 	'propertyType.icon': 'Icon',
 	'propertyType.color': 'Color',
+	'preset.amapVector': 'Amap Vector',
+	'preset.amapSatellite': 'Amap Satellite',
+	'preset.amapSatelliteRoads': 'Amap Satellite + Roads',
 };
 
 const zh: Translations = {
@@ -111,6 +119,7 @@ const zh: Translations = {
 	'settings.enableGeolocation': '启用地理定位',
 	'settings.enableGeolocationDesc': '在地图上显示您的当前位置。需要位置权限。',
 	'settings.backgrounds': '背景图层',
+	'settings.backgroundsDesc': '添加可用于所有地图的背景图层集。',
 	'settings.addFromPreset': '从预设添加...',
 	'settings.addCustom': '添加自定义',
 	'settings.noBackgrounds': '添加可用于所有地图的背景图层集。',
@@ -157,6 +166,9 @@ const zh: Translations = {
 	'viewOption.mapTilesDark': '深色模式地图瓦片',
 	'propertyType.icon': '图标',
 	'propertyType.color': '颜色',
+	'preset.amapVector': '高德矢量',
+	'preset.amapSatellite': '高德卫星',
+	'preset.amapSatelliteRoads': '高德卫星 + 路网',
 };
 
 const translations: Record<Locale, Translations> = { en, zh };
