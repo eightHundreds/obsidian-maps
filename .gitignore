@@ -28,3 +28,4 @@ tests/vault/.obsidian/workspace.json
 app.js
 tests/**/*.md
 tests/**/*.base
+.omc
