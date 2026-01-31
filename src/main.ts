@@ -3,7 +3,6 @@ import { MapView, getViewOptions } from './map-view';
 import { MapSettings, DEFAULT_SETTINGS, MapSettingTab } from './settings';
 import { initI18n, t } from './i18n';
 import { registerCustomPropertyTypes } from './property-types';
-
 const HOVER_SOURCE_ID = 'bases-map';
 
 export default class ObsidianMapsPlugin extends Plugin {
@@ -35,9 +34,9 @@ export default class ObsidianMapsPlugin extends Plugin {
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-		this.settings.tileSets = this.settings.tileSets.map(ts => ({
+		this.settings.tileSets = this.settings.tileSets.map((ts) => ({
 			...ts,
-			coordSystem: ts.coordSystem || 'wgs84'
+			coordSystem: ts.coordSystem || 'wgs84',
 		}));
 	}
 

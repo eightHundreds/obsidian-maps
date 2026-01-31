@@ -5,6 +5,7 @@
 
 const PI = Math.PI;
 const A = 6378245.0; // Semi-major axis
+// eslint-disable-next-line no-loss-of-precision
 const EE = 0.00669342162296594323; // Eccentricity squared
 
 function transformLat(x: number, y: number): number {

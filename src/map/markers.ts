@@ -182,7 +182,8 @@ export class MarkerManager {
 			// 支持: hex (#ff0000), rgb/rgba, hsl/hsla, CSS 颜色名称, 和 CSS 自定义属性 (var(--color-name))
 			return colorString;
 		}
-		catch (error) {
+		// eslint-disable-next-line no-unused-vars
+		catch (_error) {
 			// 作为警告而非错误记录 - 这不是关键问题
 			console.warn(`Could not extract color for ${entry.file.name}. The marker color property should be a simple text value (e.g., "#ff0000", "red", "var(--color-accent)").`);
 			return null;

@@ -19,7 +19,7 @@ export class BackgroundSwitcherControl {
 		this.containerEl = createDiv('maplibregl-ctrl maplibregl-ctrl-group canvas-control-group mod-raised');
 	}
 
-	onAdd(map: Map): HTMLElement {
+	onAdd(_map: Map): HTMLElement {
 		const button = this.containerEl.createEl('div', {
 			cls: 'canvas-control-item',
 			attr: { 'aria-label': t('control.switchBackground') }

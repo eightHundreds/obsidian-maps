@@ -24,7 +24,7 @@ import { GeolocationManager } from './map/geolocation';
 import { hasOwnProperty, coordinateFromValue } from './map/utils';
 import { rtlPluginCode } from './map/rtl-plugin-code';
 import { wgs84ToGcj02, gcj02ToWgs84 } from './map/coords';
-import type { CoordSystem, TileSet } from './settings';
+import type { CoordSystem } from './settings';
 import { t } from './i18n';
 
 interface MapConfig {
@@ -239,8 +239,6 @@ export class MapView extends BasesView implements HoverParent {
 
 		this.map.addControl(new CustomZoomControl(), 'top-right');
 
-		
-
 		if (this.plugin.settings.tileSets.length > 1) {
 			const currentId = this.mapConfig.currentTileSetId || this.plugin.settings.tileSets[0]?.id || '';
 			if (currentId) {
@@ -258,7 +256,7 @@ export class MapView extends BasesView implements HoverParent {
 		if (this.plugin.settings.enableGeolocation && this.geolocationManager.isSupported()) {
 			this.geolocationManager.setMap(this.map);
 			this.geolocationManager.setCoordSystem(this.mapConfig.mapCoordSystem);
-			
+
 			this.locateControl = new LocateControl(() => {
 				void this.geolocationManager.locateAndFlyTo();
 			});
@@ -592,10 +590,11 @@ export class MapView extends BasesView implements HoverParent {
 
 	private getCenterFromConfig(): [number, number] {
 		let centerConfig: Value;
-		
+
 		try {
 			centerConfig = this.config.getEvaluatedFormula(this, 'center');
-		} catch (error) {
+		// eslint-disable-next-line no-unused-vars
+		} catch (_error) {
 			// 公式计算失败（例如，当没有活动文件时 this.file 为 null）
 			// 回退到原始配置值
 			const centerConfigStr = this.config.get('center');
@@ -809,7 +808,7 @@ export function getViewOptions(): ViewOption[] {
 			]
 		},
 		{
-		displayName: t('viewOption.markers'),
+			displayName: t('viewOption.markers'),
 			type: 'group',
 			items: [
 				{
