@@ -1,12 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pnpm:*)"
+      "Bash(pnpm:*)",
+      "Bash(npx:*)",
+      "Bash(find:*)"
     ]
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "filesystem",
     "exa"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
