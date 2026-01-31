@@ -3,12 +3,26 @@
     "allow": [
       "Bash(pnpm:*)",
       "Bash(npx:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "mcp__plugin_oh-my-claudecode*"
     ]
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "filesystem",
     "exa"
-  ]
+  ],
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx oxlint"
+          }
+        ]
+      }
+    ]
+  }
 }
