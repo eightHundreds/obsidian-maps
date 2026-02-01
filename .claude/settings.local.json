@@ -6,7 +6,8 @@
       "Bash(find:*)",
       "mcp__plugin_oh-my-claudecode",
       "Bash(node:*)",
-      "Bash(xargs ls:*)"
+      "Bash(xargs ls:*)",
+      "Bash(git add:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
@@ -21,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx oxlint"
+            "command": ".claude/hooks/oxlint-fix.sh"
           }
         ]
       }
