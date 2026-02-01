@@ -71,7 +71,7 @@ export class GeolocationManager {
 	locateOnce(): Promise<UserLocation | null> {
 		if (!this.isSupported()) {
 			new Notice('Geolocation is not supported on this device');
-			return null;
+			return Promise.resolve(null);
 		}
 
 		this.setStatus('locating');
@@ -280,33 +280,33 @@ export class GeolocationManager {
 				(source as maplibregl.GeoJSONSource).setData(circleData);
 			}
 		} else if (!this.map.getSource('user-location-accuracy')) {
-				this.map.addSource('user-location-accuracy', {
-					type: 'geojson',
-					data: circleData,
-				});
+			this.map.addSource('user-location-accuracy', {
+				type: 'geojson',
+				data: circleData,
+			});
 
-				this.map.addLayer({
-					id: 'user-location-accuracy-fill',
-					type: 'fill',
-					source: 'user-location-accuracy',
-					paint: {
-						'fill-color': '#4285f4',
-						'fill-opacity': 0.15,
-					},
-				});
+			this.map.addLayer({
+				id: 'user-location-accuracy-fill',
+				type: 'fill',
+				source: 'user-location-accuracy',
+				paint: {
+					'fill-color': '#4285f4',
+					'fill-opacity': 0.15,
+				},
+			});
 
-				this.map.addLayer({
-					id: 'user-location-accuracy-stroke',
-					type: 'line',
-					source: 'user-location-accuracy',
-					paint: {
-						'line-color': '#4285f4',
-						'line-width': 1,
-						'line-opacity': 0.3,
-					},
-				});
+			this.map.addLayer({
+				id: 'user-location-accuracy-stroke',
+				type: 'line',
+				source: 'user-location-accuracy',
+				paint: {
+					'line-color': '#4285f4',
+					'line-width': 1,
+					'line-opacity': 0.3,
+				},
+			});
 
-				this.accuracyCircleSourceAdded = true;
+			this.accuracyCircleSourceAdded = true;
 		}
 	}
 
