@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-maps",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"description": "Adds map view to Obsidian Bases.",
 	"main": "main.js",
 	"scripts": {
