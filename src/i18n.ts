@@ -177,7 +177,7 @@ let currentLocale: Locale = 'en';
 
 export function detectLocale(): Locale {
 	// @ts-expect-error moment is a global in Obsidian
-	const momentLocale = typeof moment !== 'undefined' ? moment.locale() : null;
+	const momentLocale = typeof moment === 'undefined' ? null : moment.locale();
 	
 	if (momentLocale) {
 		if (momentLocale.startsWith('zh')) {

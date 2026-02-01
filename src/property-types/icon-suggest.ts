@@ -50,9 +50,10 @@ export class IconSuggest extends AbstractInputSuggest<string> {
 		}
 
 		// Filter icons by query
+		// Limit results for performance
 		return icons
 			.filter(icon => icon.toLowerCase().includes(lowerQuery))
-			.slice(0, 50); // Limit results for performance
+			.slice(0, 50);
 	}
 
 	public renderSuggestion(iconId: string, el: HTMLElement): void {

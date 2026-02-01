@@ -97,7 +97,7 @@ function formatUrl(urlObject: { protocol: string; authority: string; path: strin
 	urlObject.protocol = apiUrlObject.protocol;
 	urlObject.authority = apiUrlObject.authority;
 	urlObject.params.push(`access_token=${accessToken}`);
-	const params = urlObject.params.length ? `?${urlObject.params.join('&')}` : '';
+	const params = urlObject.params.length > 0 ? `?${urlObject.params.join('&')}` : '';
 	return `${urlObject.protocol}://${urlObject.authority}${urlObject.path}${params}`;
 }
 

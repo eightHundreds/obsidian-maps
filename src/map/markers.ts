@@ -55,7 +55,7 @@ export class MarkerManager {
 			el.style.height = '1px';
 			el.style.pointerEvents = 'none';
 			el.style.opacity = '0';
-			container.appendChild(el);
+			container.append(el);
 			this.hoverAnchorEl = el;
 		}
 		return this.hoverAnchorEl;
@@ -202,11 +202,9 @@ export class MarkerManager {
 			const color = this.getCustomColor(markerData.entry) || 'var(--bases-map-marker-background)';
 			const compositeKey = this.getCompositeImageKey(icon, color);
 
-			if (!this.loadedIcons.has(compositeKey)) {
-				if (!uniqueKeys.has(compositeKey)) {
-					compositeImagesToLoad.push({ icon, color });
-					uniqueKeys.add(compositeKey);
-				}
+			if (!this.loadedIcons.has(compositeKey) && !uniqueKeys.has(compositeKey)) {
+				compositeImagesToLoad.push({ icon, color });
+				uniqueKeys.add(compositeKey);
 			}
 		}
 
@@ -231,7 +229,7 @@ export class MarkerManager {
 	}
 
 	private getCompositeImageKey(icon: string | null, color: string): string {
-		return `marker-${icon || 'dot'}-${color.replace(/[^a-zA-Z0-9]/g, '')}`;
+		return `marker-${icon || 'dot'}-${color.replaceAll(/[^a-zA-Z0-9]/g, '')}`;
 	}
 
 	private resolveColor(color: string): string {
@@ -239,7 +237,7 @@ export class MarkerManager {
 		const tempEl = document.createElement('div');
 		tempEl.style.color = color;
 		tempEl.style.display = 'none';
-		document.body.appendChild(tempEl);
+		document.body.append(tempEl);
 
 		// 获取计算后的颜色值
 		const computedColor = getComputedStyle(tempEl).color;
@@ -256,8 +254,10 @@ export class MarkerManager {
 		const resolvedIconColor = this.resolveColor('var(--bases-map-marker-icon-color)');
 
 		// 创建高分辨率画布以在视网膜显示屏上清晰渲染
-		const scale = 4; // 4倍分辨率以获得清晰显示
-		const size = 48 * scale; // 高分辨率画布
+		// 4倍分辨率以获得清晰显示
+		const scale = 4;
+		// 高分辨率画布
+		const size = 48 * scale;
 		const canvas = document.createElement('canvas');
 		canvas.width = size;
 		canvas.height = size;
@@ -388,9 +388,11 @@ export class MarkerManager {
 					'interpolate',
 					['linear'],
 					['zoom'],
-					0, 0.12,   // 非常小
+					// 非常小
+					0, 0.12,
 					4, 0.18,
-					14, 0.22,  // 正常大小
+					// 正常大小
+					14, 0.22,
 					18, 0.24
 				],
 				'icon-allow-overlap': true,

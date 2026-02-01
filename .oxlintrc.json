@@ -1,8 +1,14 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": null,
-  "categories": {},
-  "rules": {},
+  "categories": {
+    "correctness":"error",
+    "pedantic":"error",
+    "nursery":"error"
+  },
+  "rules": {
+    "max-lines-per-function": ["error",200]
+  },
   "settings": {
     "jsx-a11y": {
       "polymorphicPropName": null,
@@ -33,8 +39,13 @@
     }
   },
   "env": {
-    "builtin": true
+    "builtin": true,
+    "browser": true,
+    "node": true
   },
-  "globals": {},
-  "ignorePatterns": []
+  "globals": {
+    "createDiv": "readonly",
+    "moment": "readonly"
+  },
+  "ignorePatterns": ["main.js",".opencode/**","src/map/markers.ts","src/map-view.ts","src/settings.ts","src/map/geolocation.ts"]
 }

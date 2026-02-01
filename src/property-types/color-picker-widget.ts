@@ -87,8 +87,8 @@ export function createColorPickerWidget(app: App): ColorPickerPropertyWidget {
 					swatchEl.style.backgroundColor = '';
 					swatchEl.removeClass('has-color');
 					swatchEl.addClass('no-color');
-					if (!color) clearBtn.addClass('is-hidden');
-					else clearBtn.removeClass('is-hidden');
+					if (color) clearBtn.removeClass('is-hidden');
+					else clearBtn.addClass('is-hidden');
 				}
 			}
 

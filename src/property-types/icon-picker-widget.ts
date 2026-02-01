@@ -99,8 +99,8 @@ export function createIconPickerWidget(app: App): IconPickerPropertyWidget {
 					setIcon(previewEl, 'lucide-image-off');
 					previewEl.removeClass('has-icon');
 					previewEl.addClass('no-icon');
-					if (!iconId) clearBtn.addClass('is-hidden');
-					else clearBtn.removeClass('is-hidden');
+					if (iconId) clearBtn.removeClass('is-hidden');
+					else clearBtn.addClass('is-hidden');
 				}
 			}
 

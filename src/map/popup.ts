@@ -77,7 +77,8 @@ export class PopupManager {
 			}
 			this.popupHideTimeout = null;
 			this.popupHideTimeoutWin = null;
-		}, 150); // Small delay to allow moving to popup
+		// Small delay to allow moving to popup
+		}, 150);
 	}
 
 	clearPopupHideTimeout(): void {
@@ -109,11 +110,13 @@ export class PopupManager {
 		const containerEl = createDiv('bases-map-popup');
 
 		// Get properties that have values
-		const propertiesSlice = properties.slice(0, 20); // Max 20 properties
+		// Max 20 properties
+		const propertiesSlice = properties.slice(0, 20);
 		const propertiesWithValues = [];
 
 		for (const prop of propertiesSlice) {
-			if (prop === coordinatesProp || prop === markerIconProp || prop === markerColorProp) continue; // Skip coordinates, marker icon, and marker color properties
+			// Skip coordinates, marker icon, and marker color properties
+			if (prop === coordinatesProp || prop === markerIconProp || prop === markerColorProp) continue;
 
 			try {
 				const value = entry.getValue(prop);
@@ -181,10 +184,12 @@ export class PopupManager {
 		markerIconProp: BasesPropertyId | null,
 		markerColorProp: BasesPropertyId | null
 	): boolean {
-		const propertiesSlice = properties.slice(0, 20); // Max 20 properties
+		// Max 20 properties
+		const propertiesSlice = properties.slice(0, 20);
 
 		for (const prop of propertiesSlice) {
-			if (prop === coordinatesProp || prop === markerIconProp || prop === markerColorProp) continue; // Skip coordinates, marker icon, and marker color properties
+			// Skip coordinates, marker icon, and marker color properties
+			if (prop === coordinatesProp || prop === markerIconProp || prop === markerColorProp) continue;
 
 			try {
 				const value = entry.getValue(prop);

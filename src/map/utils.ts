@@ -64,6 +64,6 @@ export function parseCoordinate(value: unknown): number | null {
  * Wrapper for Object.hasOwn which performs type narrowing
  */
 export function hasOwnProperty<K extends PropertyKey>(o: unknown, v: K): o is Record<K, unknown> {
-	return o != null && typeof o === 'object' && Object.hasOwn(o, v);
+	return o !== null && typeof o === 'object' && Object.hasOwn(o, v);
 }
 

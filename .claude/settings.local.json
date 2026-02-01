@@ -4,7 +4,9 @@
       "Bash(pnpm:*)",
       "Bash(npx:*)",
       "Bash(find:*)",
-      "mcp__plugin_oh-my-claudecode*"
+      "mcp__plugin_oh-my-claudecode",
+      "Bash(node:*)",
+      "Bash(xargs ls:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

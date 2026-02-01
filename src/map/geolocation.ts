@@ -18,14 +18,21 @@ export class GeolocationManager {
 	private userLocation: UserLocation | null = null;
 	private watchId: number | null = null;
 	private status: GeolocationStatus = 'idle';
-	
+
 	private locationMarker: Marker | null = null;
 	private accuracyCircleSourceAdded = false;
-	
+
 	private onStatusChange: ((status: GeolocationStatus) => void) | null = null;
 	private onLocationUpdate: ((location: UserLocation) => void) | null = null;
 
-	constructor() {}
+	// Periodic tracking properties
+	private periodicTrackingInterval: number | null = null;
+	private isPageVisible = true;
+	private visibilityChangeHandler: (() => void) | null = null;
+
+	constructor() {
+		this.setupVisibilityListener();
+	}
 
 	setMap(map: Map | null): void {
 		this.map = map;
@@ -61,7 +68,7 @@ export class GeolocationManager {
 		return 'geolocation' in navigator;
 	}
 
-	async locateOnce(): Promise<UserLocation | null> {
+	locateOnce(): Promise<UserLocation | null> {
 		if (!this.isSupported()) {
 			new Notice('Geolocation is not supported on this device');
 			return null;
@@ -84,7 +91,7 @@ export class GeolocationManager {
 					enableHighAccuracy: true,
 					maximumAge: 10000,
 					timeout: 15000,
-				}
+				},
 			);
 		});
 	}
@@ -115,7 +122,7 @@ export class GeolocationManager {
 				enableHighAccuracy: true,
 				maximumAge: 5000,
 				timeout: 20000,
-			}
+			},
 		);
 	}
 
@@ -127,12 +134,77 @@ export class GeolocationManager {
 		this.setStatus('idle');
 	}
 
+	async startPeriodicTracking(): Promise<boolean> {
+		if (!this.isSupported()) {
+			new Notice('Geolocation is not supported on this device');
+			return false;
+		}
+
+		// Already tracking
+		if (this.periodicTrackingInterval !== null) {
+			return true;
+		}
+
+		// Try to locate once first
+		const location = await this.locateOnce();
+
+		// Only start periodic tracking if first location was successful
+		if (location === null || this.status === 'error') {
+			// First location failed, don't start tracking
+			this.setStatus('idle');
+			return false;
+		}
+
+		// First location succeeded, fly to the location
+		if (this.map) {
+			let lat = location.latitude;
+			let lng = location.longitude;
+			if (this.coordSystem === 'gcj02') {
+				[lat, lng] = wgs84ToGcj02(lat, lng);
+			}
+			this.map.flyTo({
+				center: [lng, lat],
+				zoom: Math.max(this.map.getZoom(), 15),
+				duration: 1000,
+			});
+		}
+
+		// Set up interval for periodic tracking (every 30 seconds)
+		this.periodicTrackingInterval = window.setInterval(() => {
+			// Only locate if page is visible
+			if (this.isPageVisible) {
+				void this.locateOnce();
+			}
+		}, 30000);
+
+		return true;
+	}
+
+	stopPeriodicTracking(): void {
+		if (this.periodicTrackingInterval !== null) {
+			window.clearInterval(this.periodicTrackingInterval);
+			this.periodicTrackingInterval = null;
+		}
+		this.setStatus('idle');
+	}
+
+	isPeriodicTracking(): boolean {
+		return this.periodicTrackingInterval !== null;
+	}
+
+	private setupVisibilityListener(): void {
+		this.visibilityChangeHandler = () => {
+			this.isPageVisible = document.visibilityState === 'visible';
+		};
+		document.addEventListener('visibilitychange', this.visibilityChangeHandler);
+	}
+
 	async locateAndFlyTo(): Promise<void> {
 		const location = await this.locateOnce();
 		if (location && this.map) {
 			let lat = location.latitude;
 			let lng = location.longitude;
-			
+
 			if (this.coordSystem === 'gcj02') {
 				[lat, lng] = wgs84ToGcj02(lat, lng);
 			}
@@ -165,7 +237,7 @@ export class GeolocationManager {
 
 		let lat = this.userLocation.latitude;
 		let lng = this.userLocation.longitude;
-		
+
 		if (this.coordSystem === 'gcj02') {
 			[lat, lng] = wgs84ToGcj02(lat, lng);
 		}
@@ -176,9 +248,7 @@ export class GeolocationManager {
 			this.locationMarker.setLngLat(lngLat);
 		} else {
 			const el = this.createLocationMarkerElement();
-			this.locationMarker = new Marker({ element: el })
-				.setLngLat(lngLat)
-				.addTo(this.map);
+			this.locationMarker = new Marker({ element: el }).setLngLat(lngLat).addTo(this.map);
 		}
 
 		this.updateAccuracyCircle(lat, lng, this.userLocation.accuracy);
@@ -187,15 +257,15 @@ export class GeolocationManager {
 	private createLocationMarkerElement(): HTMLElement {
 		const el = document.createElement('div');
 		el.className = 'bases-map-user-location';
-		
+
 		const dot = document.createElement('div');
 		dot.className = 'bases-map-user-location-dot';
 		el.appendChild(dot);
-		
+
 		const pulse = document.createElement('div');
 		pulse.className = 'bases-map-user-location-pulse';
 		el.appendChild(pulse);
-		
+
 		return el;
 	}
 
@@ -204,8 +274,12 @@ export class GeolocationManager {
 
 		const circleData = this.createCircleGeoJSON(lng, lat, accuracy);
 
-		if (!this.accuracyCircleSourceAdded) {
-			if (!this.map.getSource('user-location-accuracy')) {
+		if (this.accuracyCircleSourceAdded) {
+			const source = this.map.getSource('user-location-accuracy');
+			if (source && 'setData' in source) {
+				(source as maplibregl.GeoJSONSource).setData(circleData);
+			}
+		} else if (!this.map.getSource('user-location-accuracy')) {
 				this.map.addSource('user-location-accuracy', {
 					type: 'geojson',
 					data: circleData,
@@ -233,16 +307,14 @@ export class GeolocationManager {
 				});
 
 				this.accuracyCircleSourceAdded = true;
-			}
-		} else {
-			const source = this.map.getSource('user-location-accuracy');
-			if (source && 'setData' in source) {
-				(source as maplibregl.GeoJSONSource).setData(circleData);
-			}
 		}
 	}
 
-	private createCircleGeoJSON(lng: number, lat: number, radiusMeters: number): GeoJSON.FeatureCollection {
+	private createCircleGeoJSON(
+		lng: number,
+		lat: number,
+		radiusMeters: number,
+	): GeoJSON.FeatureCollection {
 		const points = 64;
 		const coordinates: [number, number][] = [];
 		const EARTH_RADIUS_METERS = 6371000;
@@ -250,8 +322,10 @@ export class GeolocationManager {
 		for (let i = 0; i <= points; i++) {
 			const angle = (i / points) * 2 * Math.PI;
 			const latOffset = (radiusMeters / EARTH_RADIUS_METERS) * (180 / Math.PI);
-			const lngOffset = (radiusMeters / (EARTH_RADIUS_METERS * Math.cos((lat * Math.PI) / 180))) * (180 / Math.PI);
-			
+			const lngOffset =
+				(radiusMeters / (EARTH_RADIUS_METERS * Math.cos((lat * Math.PI) / 180))) *
+				(180 / Math.PI);
+
 			coordinates.push([
 				lng + lngOffset * Math.cos(angle),
 				lat + latOffset * Math.sin(angle),
@@ -320,8 +394,15 @@ export class GeolocationManager {
 
 	cleanup(): void {
 		this.stopWatching();
+		this.stopPeriodicTracking();
 		this.removeLocationMarker();
 		this.userLocation = null;
 		this.map = null;
+
+		// Remove visibility change listener
+		if (this.visibilityChangeHandler) {
+			document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
+			this.visibilityChangeHandler = null;
+		}
 	}
 }
