@@ -8,7 +8,8 @@
       "Bash(node:*)",
       "Bash(xargs ls:*)",
       "Bash(git add:*)"
-    ]
+    ],
+    "defaultMode": "acceptEdits"
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
