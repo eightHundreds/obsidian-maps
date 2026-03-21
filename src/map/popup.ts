@@ -1,4 +1,4 @@
-import { App, BasesEntry, BasesPropertyId, ListValue, Value } from 'obsidian';
+import { App, BasesEntry, BasesPropertyId, Keymap, ListValue, Value } from 'obsidian';
 import { Popup, Map } from 'maplibre-gl';
 
 export class PopupManager {
@@ -8,10 +8,12 @@ export class PopupManager {
 	private popupHideTimeoutWin: Window | null = null;
 	private containerEl: HTMLElement;
 	private app: App;
+	private hoverParent: { hoverPopover: any };
 
-	constructor(containerEl: HTMLElement, app: App) {
+	constructor(containerEl: HTMLElement, app: App, hoverParent: { hoverPopover: any }) {
 		this.containerEl = containerEl;
 		this.app = app;
+		this.hoverParent = hoverParent;
 	}
 
 	setMap(map: Map | null): void {
@@ -29,7 +31,7 @@ export class PopupManager {
 	): void {
 		if (!this.map) return;
 
-		// Only show popup if there are properties to display
+		// 仅当有属性值要显示时才显示弹窗
 		if (
 			!properties ||
 			properties.length === 0 ||
@@ -46,7 +48,7 @@ export class PopupManager {
 
 		this.clearPopupHideTimeout();
 
-		// Create shared popup if it doesn't exist
+		// 如果弹窗不存在则创建共享弹窗
 		if (!this.sharedPopup) {
 			const sharedPopup = (this.sharedPopup = new Popup({
 				closeButton: false,
@@ -54,7 +56,7 @@ export class PopupManager {
 				offset: 25,
 			}));
 
-			// Add hover handlers to the popup itself
+			// 为弹窗本身添加悬停处理器
 			sharedPopup.on('open', () => {
 				const popupEl = sharedPopup.getElement();
 				if (popupEl) {
@@ -68,7 +70,7 @@ export class PopupManager {
 			});
 		}
 
-		// Update popup content and position
+		// 更新弹窗内容和位置
 		const [lat, lng] = coordinates;
 		const popupContent = this.createPopupContent(
 			entry,
@@ -91,7 +93,7 @@ export class PopupManager {
 			}
 			this.popupHideTimeout = null;
 			this.popupHideTimeoutWin = null;
-			// Small delay to allow moving to popup
+			// 允许移动到弹窗的小延迟
 		}, 150);
 	}
 
@@ -123,13 +125,13 @@ export class PopupManager {
 	): HTMLElement {
 		const containerEl = createDiv('bases-map-popup');
 
-		// Get properties that have values
-		// Max 20 properties
+		// 获取有值的属性
+		// 最多 20 个属性
 		const propertiesSlice = properties.slice(0, 20);
 		const propertiesWithValues = [];
 
 		for (const prop of propertiesSlice) {
-			// Skip coordinates, marker icon, and marker color properties
+			// 跳过坐标、标记图标和标记颜色属性
 			if (prop === coordinatesProp || prop === markerIconProp || prop === markerColorProp)
 				continue;
 
@@ -139,25 +141,43 @@ export class PopupManager {
 					propertiesWithValues.push({ prop, value });
 				}
 			} catch {
-				// Skip properties that can't be rendered
+				// 跳过无法呈现的属性
 			}
 		}
 
-		// Use first property as title (still acts as a link to the file)
+		// 使用第一个属性作为标题（仍然作为指向文件的链接）
 		if (propertiesWithValues.length > 0) {
 			const firstProperty = propertiesWithValues[0];
 			const titleEl = containerEl.createDiv('bases-map-popup-title');
 
-			// Create a clickable link that opens the file
+			// 创建可点击的链接以打开文件
 			const titleLinkEl = titleEl.createEl('a', {
-				href: entry.file.path,
 				cls: 'internal-link',
 			});
 
-			// Render the first property value inside the link
+			// 点击跳转到文件，支持 Cmd/Ctrl 在新标签页打开
+			titleLinkEl.onClickEvent((evt) => {
+				if (evt.button !== 0 && evt.button !== 1) return;
+				evt.preventDefault();
+				const modEvent = Keymap.isModEvent(evt);
+				void this.app.workspace.openLinkText(entry.file.path, '', modEvent);
+			});
+
+			// 鼠标悬停时触发预览
+			titleLinkEl.addEventListener('mouseover', (evt) => {
+				this.app.workspace.trigger('hover-link', {
+					event: evt,
+					source: 'bases',
+					hoverParent: this.hoverParent,
+					targetEl: titleLinkEl,
+					linktext: entry.file.path,
+				});
+			});
+
+			// 将第一个属性值呈现在链接内
 			firstProperty.value.renderTo(titleLinkEl, this.app.renderContext);
 
-			// Show remaining properties (excluding the first one used as title)
+			// 显示剩余属性（排除用作标题的第一个属性）
 			const remainingProperties = propertiesWithValues.slice(1);
 			if (remainingProperties.length > 0) {
 				const propContainerEl = containerEl.createDiv('bases-map-popup-properties');
@@ -177,7 +197,7 @@ export class PopupManager {
 	private hasNonEmptyValue(value: Value): boolean {
 		if (!value || !value.isTruthy()) return false;
 
-		// Handle ListValue - check if it has any non-empty items
+		// 处理 ListValue - 检查是否有任何非空项
 		if (value instanceof ListValue) {
 			for (let i = 0; i < value.length(); i++) {
 				const item = value.get(i);
@@ -198,11 +218,11 @@ export class PopupManager {
 		markerIconProp: BasesPropertyId | null,
 		markerColorProp: BasesPropertyId | null,
 	): boolean {
-		// Max 20 properties
+		// 最多 20 个属性
 		const propertiesSlice = properties.slice(0, 20);
 
 		for (const prop of propertiesSlice) {
-			// Skip coordinates, marker icon, and marker color properties
+			// 跳过坐标、标记图标和标记颜色属性
 			if (prop === coordinatesProp || prop === markerIconProp || prop === markerColorProp)
 				continue;
 
@@ -212,7 +232,7 @@ export class PopupManager {
 					return true;
 				}
 			} catch {
-				// Skip properties that can't be rendered
+				// 跳过无法呈现的属性
 			}
 		}
 

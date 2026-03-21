@@ -27,7 +27,7 @@ export class MarkerManager {
 		hoverParent: HoverParent,
 		getData: () => any,
 		getMapConfig: () => any,
-		getDisplayName: (prop: BasesPropertyId) => string
+		getDisplayName: (prop: BasesPropertyId) => string,
 	) {
 		this.app = app;
 		this.mapEl = mapEl;
@@ -88,9 +88,8 @@ export class MarkerManager {
 			try {
 				const value = entry.getValue(mapConfig.coordinatesProp);
 				coordinates = coordinateFromValue(value);
-			}
-			catch (error) {
-				console.error(`Error extracting coordinates for ${entry.file.name}:`, error);
+			} catch (error) {
+				console.error(`获取 ${entry.file.name} 的坐标时出错:`, error);
 			}
 
 			if (coordinates) {
@@ -106,8 +105,8 @@ export class MarkerManager {
 		const coordSystem: CoordSystem = mapConfig?.mapCoordSystem || 'wgs84';
 
 		// 计算所有标记点的边界范围
-		const bounds = this.bounds = new LngLatBounds();
-		validMarkers.forEach(markerData => {
+		const bounds = (this.bounds = new LngLatBounds());
+		validMarkers.forEach((markerData) => {
 			let [lat, lng] = markerData.coordinates;
 			if (coordSystem === 'gcj02') {
 				[lat, lng] = wgs84ToGcj02(lat, lng);
@@ -154,15 +153,22 @@ export class MarkerManager {
 			const iconString = value.toString().trim();
 
 			// 处理 null/空/无效情况 - 返回 null 以显示默认标记
-			if (!iconString || iconString.length === 0 || iconString === 'null' || iconString === 'undefined') {
+			if (
+				!iconString ||
+				iconString.length === 0 ||
+				iconString === 'null' ||
+				iconString === 'undefined'
+			) {
 				return null;
 			}
 
 			return iconString;
-		}
-		catch (error) {
+		} catch (error) {
 			// 作为警告而非错误记录 - 这不是关键问题
-			console.warn(`Could not extract icon for ${entry.file.name}. The marker icon property should be a simple text value (e.g., "map", "star").`, error);
+			console.warn(
+				`无法提取 ${entry.file.name} 的图标。标记图标属性应为简单文本值（例如"map"、"star"）。`,
+				error,
+			);
 			return null;
 		}
 	}
@@ -179,13 +185,14 @@ export class MarkerManager {
 			const colorString = value.toString().trim();
 
 			// 原样返回颜色，让 CSS 处理验证
-			// 支持: hex (#ff0000), rgb/rgba, hsl/hsla, CSS 颜色名称, 和 CSS 自定义属性 (var(--color-name))
+			// 支持: hex (#ff0000)、rgb/rgba、hsl/hsla、CSS 颜色名称和 CSS 自定义属性 (var(--color-name))
 			return colorString;
-		}
-		// eslint-disable-next-line no-unused-vars
-		catch (_error) {
+		} catch (_error) {
+			// eslint-disable-next-line no-unused-vars
 			// 作为警告而非错误记录 - 这不是关键问题
-			console.warn(`Could not extract color for ${entry.file.name}. The marker color property should be a simple text value (e.g., "#ff0000", "red", "var(--color-accent)").`);
+			console.warn(
+				`无法提取 ${entry.file.name} 的颜色。标记颜色属性应为简单文本值（例如"#ff0000"、"red"、"var(--color-accent)"）。`,
+			);
 			return null;
 		}
 	}
@@ -199,7 +206,8 @@ export class MarkerManager {
 
 		for (const markerData of markers) {
 			const icon = this.getCustomIcon(markerData.entry);
-			const color = this.getCustomColor(markerData.entry) || 'var(--bases-map-marker-background)';
+			const color =
+				this.getCustomColor(markerData.entry) || 'var(--bases-map-marker-background)';
 			const compositeKey = this.getCompositeImageKey(icon, color);
 
 			if (!this.loadedIcons.has(compositeKey) && !uniqueKeys.has(compositeKey)) {
@@ -223,7 +231,7 @@ export class MarkerManager {
 					this.loadedIcons.add(compositeKey);
 				}
 			} catch (error) {
-				console.warn(`Failed to create composite marker for icon ${icon}:`, error);
+				console.warn(`创建图标 ${icon} 的合成标记失败:`, error);
 			}
 		}
 	}
@@ -248,7 +256,10 @@ export class MarkerManager {
 		return computedColor;
 	}
 
-	private async createCompositeMarkerImage(icon: string | null, color: string): Promise<HTMLImageElement> {
+	private async createCompositeMarkerImage(
+		icon: string | null,
+		color: string,
+	): Promise<HTMLImageElement> {
 		// 将 CSS 变量解析为实际颜色值
 		const resolvedColor = this.resolveColor(color);
 		const resolvedIconColor = this.resolveColor('var(--bases-map-marker-icon-color)');
@@ -264,7 +275,7 @@ export class MarkerManager {
 		const ctx = canvas.getContext('2d');
 
 		if (!ctx) {
-			throw new Error('Failed to get canvas context');
+			throw new Error('获取画布上下文失败');
 		}
 
 		// 启用高质量渲染
@@ -311,7 +322,7 @@ export class MarkerManager {
 							centerX - iconSize / 2,
 							centerY - iconSize / 2,
 							iconSize,
-							iconSize
+							iconSize,
 						);
 						resolve();
 					};
@@ -331,7 +342,7 @@ export class MarkerManager {
 		return new Promise((resolve, reject) => {
 			canvas.toBlob((blob) => {
 				if (!blob) {
-					reject(new Error('Failed to create image blob'));
+					reject(new Error('创建图像 blob 失败'));
 					return;
 				}
 
@@ -349,13 +360,14 @@ export class MarkerManager {
 
 		return markers.map((markerData, index) => {
 			let [lat, lng] = markerData.coordinates;
-			
+
 			if (coordSystem === 'gcj02') {
 				[lat, lng] = wgs84ToGcj02(lat, lng);
 			}
 
 			const icon = this.getCustomIcon(markerData.entry);
-			const color = this.getCustomColor(markerData.entry) || 'var(--bases-map-marker-background)';
+			const color =
+				this.getCustomColor(markerData.entry) || 'var(--bases-map-marker-background)';
 			const compositeKey = this.getCompositeImageKey(icon, color);
 
 			const properties: MapMarkerProperties = {
@@ -389,11 +401,15 @@ export class MarkerManager {
 					['linear'],
 					['zoom'],
 					// 非常小
-					0, 0.12,
-					4, 0.18,
+					0,
+					0.12,
+					4,
+					0.18,
 					// 正常大小
-					14, 0.22,
-					18, 0.24
+					14,
+					0.22,
+					18,
+					0.24,
 				],
 				'icon-allow-overlap': true,
 				'icon-ignore-placement': true,
@@ -435,7 +451,7 @@ export class MarkerManager {
 						mapConfig.coordinatesProp,
 						mapConfig.markerIconProp,
 						mapConfig.markerColorProp,
-						this.getDisplayName
+						this.getDisplayName,
 					);
 				}
 			}
@@ -464,7 +480,7 @@ export class MarkerManager {
 					anchorEl,
 					markerData.entry.file.path,
 					markerData.entry.file.path,
-					{ mode: 'source' }
+					{ mode: 'source' },
 				);
 			}
 		});
@@ -485,23 +501,26 @@ export class MarkerManager {
 				this.app.workspace.handleLinkContextMenu(menu, file.path, '');
 
 				// 添加复制坐标选项
-				menu.addItem(item => item
-					.setSection('action')
-					.setTitle('Copy coordinates')
-					.setIcon('map-pin')
-					.onClick(() => {
-						const coordString = `${lat}, ${lng}`;
-						void navigator.clipboard.writeText(coordString);
-					}));
+				menu.addItem((item) =>
+					item
+						.setSection('action')
+						.setTitle('复制坐标')
+						.setIcon('map-pin')
+						.onClick(() => {
+							const coordString = `${lat}, ${lng}`;
+							void navigator.clipboard.writeText(coordString);
+						}),
+				);
 
-				menu.addItem(item => item
-					.setSection('danger')
-					.setTitle('Delete file')
-					.setIcon('trash-2')
-					.setWarning(true)
-					.onClick(() => this.app.fileManager.promptForDeletion(file)));
+				menu.addItem((item) =>
+					item
+						.setSection('danger')
+						.setTitle('删除文件')
+						.setIcon('trash-2')
+						.setWarning(true)
+						.onClick(() => this.app.fileManager.promptForDeletion(file)),
+				);
 			}
 		});
-
 	}
 }

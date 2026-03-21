@@ -82,7 +82,7 @@ export class MapView extends BasesView implements HoverParent {
 
 		// 初始化管理器
 		this.styleManager = new StyleManager(this.app);
-		this.popupManager = new PopupManager(this.containerEl, this.app);
+		this.popupManager = new PopupManager(this.containerEl, this.app, this);
 		this.markerManager = new MarkerManager(
 			this.app,
 			this.mapEl,
