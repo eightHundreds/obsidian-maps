@@ -25,12 +25,22 @@ export class PopupManager {
 		coordinatesProp: BasesPropertyId | null,
 		markerIconProp: BasesPropertyId | null,
 		markerColorProp: BasesPropertyId | null,
-		getDisplayName: (prop: BasesPropertyId) => string
+		getDisplayName: (prop: BasesPropertyId) => string,
 	): void {
 		if (!this.map) return;
 
 		// Only show popup if there are properties to display
-		if (!properties || properties.length === 0 || !this.hasAnyPropertyValues(entry, properties, coordinatesProp, markerIconProp, markerColorProp)) {
+		if (
+			!properties ||
+			properties.length === 0 ||
+			!this.hasAnyPropertyValues(
+				entry,
+				properties,
+				coordinatesProp,
+				markerIconProp,
+				markerColorProp,
+			)
+		) {
 			return;
 		}
 
@@ -38,11 +48,11 @@ export class PopupManager {
 
 		// Create shared popup if it doesn't exist
 		if (!this.sharedPopup) {
-			const sharedPopup = this.sharedPopup = new Popup({
+			const sharedPopup = (this.sharedPopup = new Popup({
 				closeButton: false,
 				closeOnClick: false,
-				offset: 25
-			});
+				offset: 25,
+			}));
 
 			// Add hover handlers to the popup itself
 			sharedPopup.on('open', () => {
@@ -60,24 +70,28 @@ export class PopupManager {
 
 		// Update popup content and position
 		const [lat, lng] = coordinates;
-		const popupContent = this.createPopupContent(entry, properties, coordinatesProp, markerIconProp, markerColorProp, getDisplayName);
-		this.sharedPopup
-			.setDOMContent(popupContent)
-			.setLngLat([lng, lat])
-			.addTo(this.map);
+		const popupContent = this.createPopupContent(
+			entry,
+			properties,
+			coordinatesProp,
+			markerIconProp,
+			markerColorProp,
+			getDisplayName,
+		);
+		this.sharedPopup.setDOMContent(popupContent).setLngLat([lng, lat]).addTo(this.map);
 	}
 
 	hidePopup(): void {
 		this.clearPopupHideTimeout();
 
-		const win = this.popupHideTimeoutWin = this.containerEl.win;
+		const win = (this.popupHideTimeoutWin = this.containerEl.win);
 		this.popupHideTimeout = win.setTimeout(() => {
 			if (this.sharedPopup) {
 				this.sharedPopup.remove();
 			}
 			this.popupHideTimeout = null;
 			this.popupHideTimeoutWin = null;
-		// Small delay to allow moving to popup
+			// Small delay to allow moving to popup
 		}, 150);
 	}
 
@@ -105,7 +119,7 @@ export class PopupManager {
 		coordinatesProp: BasesPropertyId | null,
 		markerIconProp: BasesPropertyId | null,
 		markerColorProp: BasesPropertyId | null,
-		getDisplayName: (prop: BasesPropertyId) => string
+		getDisplayName: (prop: BasesPropertyId) => string,
 	): HTMLElement {
 		const containerEl = createDiv('bases-map-popup');
 
@@ -116,15 +130,15 @@ export class PopupManager {
 
 		for (const prop of propertiesSlice) {
 			// Skip coordinates, marker icon, and marker color properties
-			if (prop === coordinatesProp || prop === markerIconProp || prop === markerColorProp) continue;
+			if (prop === coordinatesProp || prop === markerIconProp || prop === markerColorProp)
+				continue;
 
 			try {
 				const value = entry.getValue(prop);
 				if (value && this.hasNonEmptyValue(value)) {
 					propertiesWithValues.push({ prop, value });
 				}
-			}
-			catch {
+			} catch {
 				// Skip properties that can't be rendered
 			}
 		}
@@ -137,7 +151,7 @@ export class PopupManager {
 			// Create a clickable link that opens the file
 			const titleLinkEl = titleEl.createEl('a', {
 				href: entry.file.path,
-				cls: 'internal-link'
+				cls: 'internal-link',
 			});
 
 			// Render the first property value inside the link
@@ -182,22 +196,22 @@ export class PopupManager {
 		properties: BasesPropertyId[],
 		coordinatesProp: BasesPropertyId | null,
 		markerIconProp: BasesPropertyId | null,
-		markerColorProp: BasesPropertyId | null
+		markerColorProp: BasesPropertyId | null,
 	): boolean {
 		// Max 20 properties
 		const propertiesSlice = properties.slice(0, 20);
 
 		for (const prop of propertiesSlice) {
 			// Skip coordinates, marker icon, and marker color properties
-			if (prop === coordinatesProp || prop === markerIconProp || prop === markerColorProp) continue;
+			if (prop === coordinatesProp || prop === markerIconProp || prop === markerColorProp)
+				continue;
 
 			try {
 				const value = entry.getValue(prop);
 				if (value && this.hasNonEmptyValue(value)) {
 					return true;
 				}
-			}
-			catch {
+			} catch {
 				// Skip properties that can't be rendered
 			}
 		}
