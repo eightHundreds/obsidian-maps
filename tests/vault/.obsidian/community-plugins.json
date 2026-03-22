@@ -1,3 +1,5 @@
 [
-  "maps"
+  "maps",
+  "plugin-reloader",
+  "hot-reload"
 ]

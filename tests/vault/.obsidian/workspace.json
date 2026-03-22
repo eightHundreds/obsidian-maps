@@ -77,7 +77,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "c994b042fc9c2780",
@@ -181,9 +182,10 @@
   },
   "active": "399efae06007d21b",
   "lastOpenFiles": [
-    "啊啊啊.md",
+    "带图片.md",
     "未命名.base",
     "未命名.canvas",
+    "Pasted image 20260321232316.png",
     "未命名.md",
     "未命名 4.base",
     "未命名 8.md",
