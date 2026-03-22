@@ -5,6 +5,7 @@ import { coordinateFromValue } from './utils';
 import { PopupManager } from './popup';
 import { wgs84ToGcj02 } from './coords';
 import type { CoordSystem } from '../settings';
+import { HOVER_SOURCE_ID } from '../main';
 
 export class MarkerManager {
 	private map: Map | null = null;
@@ -16,6 +17,7 @@ export class MarkerManager {
 	private popupManager: PopupManager;
 	private hoverParent: HoverParent;
 	private hoverAnchorEl: HTMLAnchorElement | null = null;
+	private hoverFocusTimer: ReturnType<typeof setTimeout> | null = null;
 	private getData: () => any;
 	private getMapConfig: () => any;
 	private getDisplayName: (prop: BasesPropertyId) => string;
@@ -46,7 +48,7 @@ export class MarkerManager {
 		if (!this.map) return null;
 		const container = this.map.getContainer();
 		if (!this.hoverAnchorEl) {
-			const el = document.createElement('a');
+			const el = container.ownerDocument.createElement('a');
 			el.className = 'internal-link';
 			el.href = '#';
 			el.tabIndex = -1;
@@ -474,14 +476,40 @@ export class MarkerManager {
 				if (typeof e.point?.x === 'number') anchorEl.style.left = `${e.point.x}px`;
 				if (typeof e.point?.y === 'number') anchorEl.style.top = `${e.point.y}px`;
 
-				this.app.workspace.trigger(
-					'link-hover',
-					this.hoverParent,
-					anchorEl,
-					markerData.entry.file.path,
-					markerData.entry.file.path,
-					{ mode: 'source' },
-				);
+				this.app.workspace.trigger('hover-link', {
+					event: e.originalEvent,
+					source: HOVER_SOURCE_ID,
+					hoverParent: this.hoverParent,
+					targetEl: anchorEl,
+					linktext: markerData.entry.file.path,
+					sourcePath: '',
+				});
+
+				// eX() 每 500ms 运行一次，对所有已显示的 popover 调用 detect()+transition()。
+				// 由于 targetEl 是 1×1px 的不可见元素，onTarget 始终为 false，
+				// 导致 popover 在出现约 800ms 后被自动关闭。
+				// 修复：在 popover 显示后将其标记为 focused，使 shouldShowSelf() 保持 true，
+				// 并添加 click-outside 监听器来负责关闭。
+				if (this.hoverFocusTimer !== null) clearTimeout(this.hoverFocusTimer);
+				this.hoverFocusTimer = setTimeout(() => {
+					this.hoverFocusTimer = null;
+					const popover = (this.hoverParent as any).hoverPopover;
+					if (!popover || popover.state === 3 /* RQ.Hidden */) return;
+
+					popover.setIsFocused(true);
+
+					// 用户点击 popover 外部时关闭它
+					const closeHandler = (evt: MouseEvent) => {
+						if (!popover.hoverEl.contains(evt.target as Node)) {
+							popover.hide();
+						}
+					};
+					document.addEventListener('click', closeHandler, { capture: true });
+					// popover 销毁时自动清理监听器
+					popover.register(() => {
+						document.removeEventListener('click', closeHandler, { capture: true });
+					});
+				}, 350);
 			}
 		});
 

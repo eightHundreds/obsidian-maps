@@ -3,7 +3,7 @@ import { MapView, getViewOptions } from './map-view';
 import { MapSettings, DEFAULT_SETTINGS, MapSettingTab } from './settings';
 import { initI18n, t } from './i18n';
 import { registerCustomPropertyTypes } from './property-types';
-const HOVER_SOURCE_ID = 'bases-map';
+export const HOVER_SOURCE_ID = 'bases-map';
 
 export default class ObsidianMapsPlugin extends Plugin {
 	settings: MapSettings;
